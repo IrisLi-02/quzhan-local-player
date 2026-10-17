@@ -1,0 +1,76 @@
+{
+  "name": "lingyin-player",
+  "version": "0.3.0",
+  "description": "聆音 - 一个会记住你听到哪里的本地音乐播放器",
+  "main": "main.cjs",
+  "author": "Iris Li",
+  "license": "SEE LICENSE IN LICENSE",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder --win portable nsis"
+  },
+  "dependencies": {
+    "music-metadata": "^12.2.2"
+  },
+  "devDependencies": {
+    "electron": "^44.9.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.lingyin.player",
+    "productName": "聆音",
+    "asar": true,
+    "files": [
+      "main.cjs",
+      "preload.cjs",
+      "overlay-preload.cjs",
+      "src/**/*",
+      "assets/**/*",
+      "LICENSE",
+      "THIRD_PARTY_NOTICES.md",
+      "package.json",
+      "node_modules/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "assets/icon.ico",
+        "to": "icon.ico"
+      }
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "icon": "assets/icon.ico",
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "Lingyin-${version}-${arch}.${ext}"
+    },
+    "portable": {
+      "artifactName": "Lingyin-Portable-${version}-${arch}.${ext}"
+    },
+    "nsis": {
+      "artifactName": "Lingyin-Setup-${version}-${arch}.${ext}",
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": false,
+      "createStartMenuShortcut": true,
+      "shortcutName": "聆音",
+      "include": "build/installer.nsh"
+    }
+  }
+}

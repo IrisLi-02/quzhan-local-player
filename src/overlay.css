@@ -1,0 +1,215 @@
+:root {
+  --accent: #e6a873;
+  --accent-rgb: 230, 168, 115;
+  --paper: #f2e9dd;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: transparent;
+  color: var(--paper);
+  font-family: "Segoe UI Variable Text", "Microsoft YaHei UI", sans-serif;
+  user-select: none;
+}
+
+body {
+  padding: 10px;
+}
+
+.overlay-shell {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: 100%;
+  flex-direction: column;
+  justify-content: center;
+  overflow: hidden;
+  padding: 22px 55px 20px 29px;
+  border: 1px solid rgba(var(--accent-rgb), 0.2);
+  border-radius: 15px;
+  background:
+    radial-gradient(circle at 10% 50%, rgba(var(--accent-rgb), 0.14), transparent 34%),
+    linear-gradient(105deg, rgba(9, 13, 18, 0.9), rgba(10, 14, 20, 0.8));
+  box-shadow:
+    0 18px 50px rgba(0, 0, 0, 0.42),
+    inset 0 1px 0 rgba(255, 246, 233, 0.04);
+  -webkit-app-region: drag;
+  backdrop-filter: blur(26px) saturate(1.25);
+}
+
+.overlay-shell::before {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 160 160' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.18'/%3E%3C/svg%3E");
+  content: "";
+  opacity: 0.1;
+  pointer-events: none;
+}
+
+.overlay-glow {
+  position: absolute;
+  top: 50%;
+  left: 23px;
+  width: 4px;
+  height: 47px;
+  border-radius: 4px;
+  background: var(--accent);
+  box-shadow:
+    0 0 19px rgba(var(--accent-rgb), 0.55),
+    0 0 54px rgba(var(--accent-rgb), 0.22);
+  opacity: 0.8;
+  transform: translateY(-50%);
+}
+
+.drag-strip {
+  position: absolute;
+  top: 0;
+  right: 50px;
+  left: 34px;
+  height: 43px;
+}
+
+.overlay-status {
+  position: absolute;
+  top: 17px;
+  left: 30px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: rgba(207, 201, 193, 0.48);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+}
+
+.status-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 7px rgba(var(--accent-rgb), 0.6);
+}
+
+body.paused .status-dot {
+  opacity: 0.35;
+  box-shadow: none;
+}
+
+.overlay-close {
+  position: absolute;
+  z-index: 3;
+  top: 14px;
+  right: 16px;
+  display: grid;
+  width: 27px;
+  height: 27px;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: rgba(222, 215, 207, 0.38);
+  cursor: pointer;
+  opacity: 0;
+  -webkit-app-region: no-drag;
+  transition:
+    opacity 160ms ease,
+    background 160ms ease,
+    color 160ms ease;
+}
+
+.overlay-shell:hover .overlay-close {
+  opacity: 1;
+}
+
+.overlay-close:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--paper);
+}
+
+.overlay-close svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+
+.lyric-stack {
+  min-width: 0;
+  transform: translateY(2px);
+}
+
+.overlay-current,
+.overlay-next {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.overlay-current {
+  color: #f5ecdf;
+  font-family: "STKaiti", "KaiTi", "Microsoft YaHei UI", serif;
+  font-size: 31px;
+  line-height: 1.35;
+  letter-spacing: 0.03em;
+  text-shadow:
+    0 2px 19px rgba(0, 0, 0, 0.55),
+    0 0 29px rgba(var(--accent-rgb), 0.1);
+  transition:
+    opacity 240ms ease,
+    transform 350ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.overlay-next {
+  margin-top: 6px;
+  color: rgba(214, 207, 198, 0.34);
+  font-family: "STKaiti", "KaiTi", "Microsoft YaHei UI", serif;
+  font-size: 15px;
+  letter-spacing: 0.04em;
+  transition: opacity 240ms ease;
+}
+
+.overlay-current.changing {
+  opacity: 0;
+  transform: translateY(5px);
+}
+
+.overlay-next.changing {
+  opacity: 0;
+}
+
+.overlay-progress {
+  position: absolute;
+  right: 30px;
+  bottom: 12px;
+  left: 31px;
+  height: 1px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.overlay-progress span {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: linear-gradient(to right, rgba(var(--accent-rgb), 0.12), var(--accent));
+  transition: width 320ms linear;
+}
+
+body.paused .overlay-current {
+  color: rgba(242, 233, 221, 0.68);
+}
+
+body.paused .overlay-progress {
+  opacity: 0.35;
+}

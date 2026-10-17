@@ -1,0 +1,789 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: lingyin-media: http://127.0.0.1:*; media-src 'self' blob: lingyin-media: http://127.0.0.1:*; font-src 'self' data:; connect-src 'self' http://127.0.0.1:*;"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>聆音</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <svg class="svg-sprite" aria-hidden="true">
+      <symbol id="i-add" viewBox="0 0 24 24">
+        <path d="M12 5v14M5 12h14" />
+      </symbol>
+      <symbol id="i-play" viewBox="0 0 24 24">
+        <path class="fill" d="M8.3 5.7c0-.9 1-1.5 1.8-1l8.3 5c.9.5.9 1.8 0 2.3l-8.3 5.1c-.8.5-1.8-.1-1.8-1V5.7Z" />
+      </symbol>
+      <symbol id="i-pause" viewBox="0 0 24 24">
+        <path class="fill" d="M7 5.5c0-.8.7-1.5 1.5-1.5S10 4.7 10 5.5v13c0 .8-.7 1.5-1.5 1.5S7 19.3 7 18.5v-13Zm7 0c0-.8.7-1.5 1.5-1.5s1.5.7 1.5 1.5v13c0 .8-.7 1.5-1.5 1.5S14 19.3 14 18.5v-13Z" />
+      </symbol>
+      <symbol id="i-prev" viewBox="0 0 24 24">
+        <path class="fill" d="M6.8 5.3v13.4M18.2 5.8v12.4c0 .8-.9 1.3-1.6.8l-7.4-6.2c-.6-.5-.6-1.4 0-1.9l7.4-5.9c.7-.5 1.6 0 1.6.8Z" />
+      </symbol>
+      <symbol id="i-next" viewBox="0 0 24 24">
+        <path class="fill" d="M17.2 5.3v13.4M5.8 5.8v12.4c0 .8.9 1.3 1.6.8l7.4-6.2c.6-.5.6-1.4 0-1.9L7.4 5c-.7-.5-1.6 0-1.6.8Z" />
+      </symbol>
+      <symbol id="i-rewind" viewBox="0 0 24 24">
+        <path d="M5.1 8.1A7.7 7.7 0 1 1 6.6 17.3" />
+        <path d="M4.5 3.6v4.9h4.9" />
+      </symbol>
+      <symbol id="i-forward" viewBox="0 0 24 24">
+        <path d="M18.9 8.1A7.7 7.7 0 1 0 17.4 17.3" />
+        <path d="M19.5 3.6v4.9h-4.9" />
+      </symbol>
+      <symbol id="i-shuffle" viewBox="0 0 24 24">
+        <path d="M4 7h2.7c4.6 0 6.2 10 10.7 10H20M17 14l3 3-3 3M4 17h2.7c1.7 0 3.1-1.3 4.4-3.1M13.1 9.2C14.3 7.9 15.6 7 17.4 7H20M17 4l3 3-3 3" />
+      </symbol>
+      <symbol id="i-repeat" viewBox="0 0 24 24">
+        <path d="M17 2.8l3.2 3.3L17 9.4M20.2 6.1H7.4a3.6 3.6 0 0 0-3.6 3.6v1.2M7 21.2l-3.2-3.3L7 14.6M3.8 17.9h12.8a3.6 3.6 0 0 0 3.6-3.6v-1.2" />
+      </symbol>
+      <symbol id="i-repeat-one" viewBox="0 0 24 24">
+        <path d="M17 2.8l3.2 3.3L17 9.4M20.2 6.1H7.4a3.6 3.6 0 0 0-3.6 3.6v1.2M7 21.2l-3.2-3.3L7 14.6M3.8 17.9h12.8a3.6 3.6 0 0 0 3.6-3.6v-1.2" />
+        <path d="M11.2 10.2l1.3-.8v5.2M10.5 14.6h4" />
+      </symbol>
+      <symbol id="i-repeat-selection" viewBox="0 0 24 24">
+        <path d="M17 2.8l3.2 3.3L17 9.4M20.2 6.1H7.4a3.6 3.6 0 0 0-3.6 3.6v1.2M7 21.2l-3.2-3.3L7 14.6M3.8 17.9h12.8a3.6 3.6 0 0 0 3.6-3.6v-1.2" />
+        <path d="M9 10v4M12 10v4M15 10v4" />
+      </symbol>
+      <symbol id="i-volume" viewBox="0 0 24 24">
+        <path class="fill" d="M4 9.5h3.2l4.1-3.4c.6-.5 1.5-.1 1.5.7v10.4c0 .8-.9 1.2-1.5.7l-4.1-3.4H4c-.6 0-1-.4-1-1v-3c0-.6.4-1 1-1Z" />
+        <path d="M16 9a4.3 4.3 0 0 1 0 6M18.7 6.4a8 8 0 0 1 0 11.2" />
+      </symbol>
+      <symbol id="i-volume-off" viewBox="0 0 24 24">
+        <path class="fill" d="M4 9.5h3.2l4.1-3.4c.6-.5 1.5-.1 1.5.7v10.4c0 .8-.9 1.2-1.5.7l-4.1-3.4H4c-.6 0-1-.4-1-1v-3c0-.6.4-1 1-1Z" />
+        <path d="m16 9 4.5 4.5M20.5 9 16 13.5" />
+      </symbol>
+      <symbol id="i-queue" viewBox="0 0 24 24">
+        <path d="M4 6h11M4 12h8M4 18h11M18.5 15v6M15.5 18h6" />
+      </symbol>
+      <symbol id="i-lyrics" viewBox="0 0 24 24">
+        <path d="M4 5.2A2.2 2.2 0 0 1 6.2 3h11.6A2.2 2.2 0 0 1 20 5.2v13.6a2.2 2.2 0 0 1-2.2 2.2H6.2A2.2 2.2 0 0 1 4 18.8V5.2Z" />
+        <path d="M8 7.5h8M8 11.5h8M8 15.5h4.5" />
+      </symbol>
+      <symbol id="i-chevron-left" viewBox="0 0 24 24">
+        <path d="m14.5 5-7 7 7 7" />
+      </symbol>
+      <symbol id="i-chevron-right" viewBox="0 0 24 24">
+        <path d="m9.5 5 7 7-7 7" />
+      </symbol>
+      <symbol id="i-trash" viewBox="0 0 24 24">
+        <path d="M4 7h16M9 7V4h6v3M7 7l.7 12.2c.1.9.8 1.5 1.7 1.5h5.2c.9 0 1.6-.6 1.7-1.5L17 7M10 11v5.5M14 11v5.5" />
+      </symbol>
+      <symbol id="i-select-all" viewBox="0 0 24 24">
+        <path d="M4 4h11v11H4z" />
+        <path d="M9 9h11v11H9z" />
+        <path d="m7 9 2.3 2.3L13 7.6" />
+      </symbol>
+      <symbol id="i-to-top" viewBox="0 0 24 24">
+        <path d="M5 4h14M12 20V9M7.5 13.5 12 9l4.5 4.5" />
+      </symbol>
+      <symbol id="i-to-bottom" viewBox="0 0 24 24">
+        <path d="M5 20h14M12 4v11M7.5 10.5 12 15l4.5-4.5" />
+      </symbol>
+      <symbol id="i-mark" viewBox="0 0 24 24">
+        <path d="M6.2 3.5h11.6A1.7 1.7 0 0 1 19.5 5v15.5L12 16.8l-7.5 3.7V5a1.7 1.7 0 0 1 1.7-1.5Z" />
+        <path d="m9.2 10 2 2 3.7-4" />
+      </symbol>
+      <symbol id="i-unmark" viewBox="0 0 24 24">
+        <path d="M6.2 3.5h11.6A1.7 1.7 0 0 1 19.5 5v15.5L12 16.8l-7.5 3.7V5a1.7 1.7 0 0 1 1.7-1.5Z" />
+        <path d="m9.2 8.8 5.3 5.3M14.5 8.8l-5.3 5.3" />
+      </symbol>
+      <symbol id="i-loop-selection" viewBox="0 0 24 24">
+        <path d="M17 2.8l3.2 3.3L17 9.4M20.2 6.1H7.4a3.6 3.6 0 0 0-3.6 3.6v1.2M7 21.2l-3.2-3.3L7 14.6M3.8 17.9h12.8a3.6 3.6 0 0 0 3.6-3.6v-1.2" />
+        <circle cx="12" cy="12" r="2.2" />
+      </symbol>
+      <symbol id="i-more" viewBox="0 0 24 24">
+        <circle class="fill" cx="5" cy="12" r="1.5" />
+        <circle class="fill" cx="12" cy="12" r="1.5" />
+        <circle class="fill" cx="19" cy="12" r="1.5" />
+      </symbol>
+      <symbol id="i-grip" viewBox="0 0 24 24">
+        <circle class="fill" cx="9" cy="7" r="1.2" />
+        <circle class="fill" cx="15" cy="7" r="1.2" />
+        <circle class="fill" cx="9" cy="12" r="1.2" />
+        <circle class="fill" cx="15" cy="12" r="1.2" />
+        <circle class="fill" cx="9" cy="17" r="1.2" />
+        <circle class="fill" cx="15" cy="17" r="1.2" />
+      </symbol>
+      <symbol id="i-search" viewBox="0 0 24 24">
+        <circle cx="10.8" cy="10.8" r="6.5" />
+        <path d="m16 16 4 4" />
+      </symbol>
+      <symbol id="i-close" viewBox="0 0 24 24">
+        <path d="m6 6 12 12M18 6 6 18" />
+      </symbol>
+      <symbol id="i-minus" viewBox="0 0 24 24">
+        <path d="M5 12h14" />
+      </symbol>
+      <symbol id="i-square" viewBox="0 0 24 24">
+        <rect x="6.5" y="6.5" width="11" height="11" rx="1" />
+      </symbol>
+      <symbol id="i-restore" viewBox="0 0 24 24">
+        <path d="M8 8V5.5h10.5V16H16M5.5 8H16v10.5H5.5z" />
+      </symbol>
+      <symbol id="i-note" viewBox="0 0 24 24">
+        <path d="M9 18V6.2l9-2v11.3M9 9l9-2" />
+        <ellipse class="fill" cx="6.5" cy="18.2" rx="2.5" ry="1.8" />
+        <ellipse class="fill" cx="15.5" cy="15.5" rx="2.5" ry="1.8" />
+      </symbol>
+      <symbol id="i-clock" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="8" />
+        <path d="M12 7.5V12l3 2" />
+      </symbol>
+      <symbol id="i-sort" viewBox="0 0 24 24">
+        <path d="M4 7h10M4 12h7M4 17h4" />
+        <path d="M17.5 5v14M14.5 16l3 3 3-3" />
+      </symbol>
+      <symbol id="i-sort-artist" viewBox="0 0 24 24">
+        <circle cx="9.2" cy="7.4" r="3.1" />
+        <path d="M3.8 19c.5-3.2 2.4-5 5.4-5s4.9 1.8 5.4 5M17 6h4M17 10h3M17 14h4M17 18h3" />
+      </symbol>
+      <symbol id="i-sort-letter" viewBox="0 0 24 24">
+        <path d="M4 18 8.3 6h1.2L13.8 18M5.7 13.7h6.4M16.2 10.8c1.8-1.1 4.1-.2 4.1 2V18M20.1 14.2c-3.4-.2-5.2.8-5.2 2.3 0 1.3 1.1 2 2.4 2 1.4 0 2.8-.8 2.8-2.4" />
+      </symbol>
+      <symbol id="i-sort-time" viewBox="0 0 24 24">
+        <path d="M4 6h8M4 11h6M4 16h4" />
+        <circle cx="16.6" cy="13.4" r="5.4" />
+        <path d="M16.6 10.3v3.2l2.2 1.3" />
+      </symbol>
+      <symbol id="i-settings" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="3.1" />
+        <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06-2.87 2.87-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21H9.5v-.1A1.7 1.7 0 0 0 8.4 19.4a1.7 1.7 0 0 0-1.87.34l-.06.06-2.87-2.87.06-.06A1.7 1.7 0 0 0 4 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H2.1V9.5h.2A1.7 1.7 0 0 0 4 8.4a1.7 1.7 0 0 0-.34-1.87l-.06-.06L6.5 3.6l.06.06A1.7 1.7 0 0 0 8.4 4a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V2.1h4.1v.2A1.7 1.7 0 0 0 15 4a1.7 1.7 0 0 0 1.87-.34l.06-.06 2.87 2.87-.06.06A1.7 1.7 0 0 0 19.4 8.4c.12.37.33.72.6 1 .3.28.68.42 1.1.4h.1v4.1h-.1A1.7 1.7 0 0 0 19.4 15Z" />
+      </symbol>
+      <symbol id="i-tray" viewBox="0 0 24 24">
+        <path d="M4 4h16v16H4zM4 14h4.5l1.8 2h3.4l1.8-2H20" />
+      </symbol>
+      <symbol id="i-power" viewBox="0 0 24 24">
+        <path d="M12 3v8M7.1 5.8a8 8 0 1 0 9.8 0" />
+      </symbol>
+      <symbol id="i-external" viewBox="0 0 24 24">
+        <path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />
+      </symbol>
+      <symbol id="i-folder" viewBox="0 0 24 24">
+        <path d="M3.5 6.5A1.5 1.5 0 0 1 5 5h5l2 2.2h7A1.5 1.5 0 0 1 20.5 8.7v9.8A1.5 1.5 0 0 1 19 20H5a1.5 1.5 0 0 1-1.5-1.5v-12Z" />
+      </symbol>
+    </svg>
+
+    <div class="app-shell" id="appShell">
+      <header class="titlebar">
+        <div class="brand-lockup">
+          <div class="brand-mark">
+            <span></span><span></span><span></span><span></span>
+          </div>
+          <div class="brand-name">聆音</div>
+          <div class="app-version" id="appVersion">V 0.3.0</div>
+          <div class="brand-edition">LOCAL / 01</div>
+        </div>
+        <div class="titlebar-center" id="titlebarCenter">把每一次聆听留在原处</div>
+        <div class="titlebar-actions">
+          <button
+            class="titlebar-button queue-title-button"
+            id="titlebarQueueToggle"
+            type="button"
+            title="展开 / 收起播放队列"
+            aria-label="展开或收起播放队列"
+          >
+            <svg><use href="#i-queue"></use></svg>
+            <span id="titlebarQueueCount">0</span>
+          </button>
+          <div class="window-controls">
+            <button class="window-button" id="windowMinimize" type="button" aria-label="最小化">
+              <svg><use href="#i-minus"></use></svg>
+            </button>
+            <button class="window-button" id="windowMaximize" type="button" aria-label="最大化">
+              <svg><use href="#i-square"></use></svg>
+            </button>
+            <button class="window-button close" id="windowClose" type="button" aria-label="关闭">
+              <svg><use href="#i-close"></use></svg>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main class="workspace" id="workspace">
+        <section class="listening-stage" id="listeningStage">
+          <div class="stage-atmosphere" aria-hidden="true">
+            <div class="atmosphere-image" id="atmosphereImage"></div>
+            <div class="atmosphere-veil"></div>
+            <div class="atmosphere-grain"></div>
+          </div>
+
+          <div class="stage-actions">
+            <button
+              class="text-button"
+              id="desktopLyricsButton"
+              type="button"
+              title="在桌面上显示当前歌词"
+            >
+              <svg><use href="#i-lyrics"></use></svg>
+              <span>桌面歌词</span>
+            </button>
+            <button
+              class="circle-button queue-open-button"
+              id="queueToggle"
+              type="button"
+              title="展开 / 收起播放队列"
+              aria-label="展开或收起播放队列"
+            >
+              <svg><use href="#i-chevron-left"></use></svg>
+            </button>
+          </div>
+
+          <div class="now-playing-layout">
+            <div class="art-column">
+              <div class="cover-composition" id="coverComposition">
+                <div class="vinyl-disc" id="vinylDisc">
+                  <div class="vinyl-grooves"></div>
+                  <div class="vinyl-label"><span>LY</span></div>
+                </div>
+                <button class="cover-art" id="coverArtButton" type="button" title="播放 / 暂停">
+                  <div class="cover-fallback" id="coverFallback">
+                    <svg><use href="#i-note"></use></svg>
+                    <span>NO COVER</span>
+                  </div>
+                  <img id="coverArt" alt="专辑封面" />
+                  <span class="cover-sheen"></span>
+                </button>
+              </div>
+
+              <div class="track-heading">
+                <div class="eyebrow"><span></span> NOW PLAYING</div>
+                <h1 id="trackTitle" class="track-title">还没有正在播放的歌</h1>
+                <div class="track-byline">
+                  <span id="trackArtist">从队列里挑一首，或把音乐拖进来</span>
+                  <span class="byline-dot" id="bylineDot"></span>
+                  <span id="trackAlbum"></span>
+                </div>
+              </div>
+
+              <div class="track-facts">
+                <div class="fact">
+                  <span class="fact-label">队列</span>
+                  <span class="fact-value" id="factQueuePosition">—</span>
+                </div>
+                <div class="fact">
+                  <span class="fact-label">本轮余下</span>
+                  <span class="fact-value" id="factUnplayed">—</span>
+                </div>
+                <div class="fact">
+                  <span class="fact-label">歌词</span>
+                  <span class="fact-value" id="factLyrics">—</span>
+                </div>
+              </div>
+            </div>
+
+            <section class="lyrics-panel" id="lyricsPanel" aria-label="歌词">
+              <div class="lyrics-toolbar">
+                <div>
+                  <div class="eyebrow"><span></span> LYRICS</div>
+                  <div class="lyrics-title">歌词</div>
+                </div>
+                <div class="lyrics-source" id="lyricsSource">等待播放</div>
+              </div>
+
+              <div class="lyrics-viewport" id="lyricsViewport">
+                <div class="lyrics-empty" id="lyricsEmpty">
+                  <div class="lyrics-empty-mark">
+                    <span>“</span>
+                  </div>
+                  <h2>让声音慢下来</h2>
+                  <p>歌曲内嵌歌词或同名 .lrc 文件会在这里逐行浮现。</p>
+                  <button class="quiet-button" id="emptyQueueButton" type="button">
+                    <svg><use href="#i-add"></use></svg>
+                    加入第一首歌
+                  </button>
+                </div>
+                <div class="lyrics-scroll" id="lyricsScroll" hidden>
+                  <div class="lyrics-content" id="lyricsContent"></div>
+                </div>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <aside class="queue-panel" id="queuePanel" aria-label="播放队列">
+          <div class="queue-drop-overlay" id="queueDropOverlay">
+            <div class="drop-orbit"></div>
+            <svg><use href="#i-add"></use></svg>
+            <h3>松手加入播放队列</h3>
+            <p>支持文件与整个文件夹</p>
+          </div>
+
+          <header class="queue-header">
+            <div>
+              <div class="eyebrow"><span></span> PLAY QUEUE</div>
+              <div class="queue-title-line">
+                <h2>播放队列</h2>
+                <span class="queue-count" id="queueCount">0 首</span>
+              </div>
+            </div>
+            <div class="queue-header-actions">
+              <button
+                class="queue-sort-button"
+                id="queueSortButton"
+                type="button"
+                title="排序播放队列"
+                aria-label="排序播放队列"
+                aria-haspopup="menu"
+              >
+                <svg><use href="#i-sort"></use></svg>
+                <span>排序</span>
+              </button>
+              <button
+                class="circle-button queue-collapse-button"
+                id="queueCollapseButton"
+                type="button"
+                title="收起播放队列"
+                aria-label="收起播放队列"
+              >
+                <svg><use href="#i-chevron-right"></use></svg>
+              </button>
+            </div>
+          </header>
+
+          <div class="queue-toolbar">
+            <button class="queue-action primary" id="addTracksButton" type="button" title="浏览本地音频">
+              <svg><use href="#i-add"></use></svg>
+              <span>添加</span>
+            </button>
+            <span class="toolbar-divider"></span>
+            <button class="queue-action" id="selectAllButton" type="button" title="全选队列" aria-label="全选队列">
+              <svg><use href="#i-select-all"></use></svg>
+            </button>
+            <button class="queue-action" id="moveTopButton" type="button" title="移到队首" aria-label="移到队首">
+              <svg><use href="#i-to-top"></use></svg>
+            </button>
+            <button class="queue-action" id="moveBottomButton" type="button" title="移到队尾" aria-label="移到队尾">
+              <svg><use href="#i-to-bottom"></use></svg>
+            </button>
+            <span class="toolbar-divider"></span>
+            <button class="queue-action" id="markPlayedButton" type="button" title="标记为已听" aria-label="标记为已听">
+              <svg><use href="#i-mark"></use></svg>
+            </button>
+            <button class="queue-action" id="unmarkPlayedButton" type="button" title="清除已听标记" aria-label="清除已听标记">
+              <svg><use href="#i-unmark"></use></svg>
+            </button>
+            <button class="queue-action" id="loopSelectionButton" type="button" title="循环选中歌曲" aria-label="循环选中歌曲">
+              <svg><use href="#i-loop-selection"></use></svg>
+            </button>
+            <button class="queue-action danger" id="removeTracksButton" type="button" title="从队列移除" aria-label="从队列移除">
+              <svg><use href="#i-trash"></use></svg>
+            </button>
+          </div>
+
+          <div class="selection-strip" id="selectionStrip">
+            <span><strong id="selectionCount">0</strong> 首已选</span>
+            <button type="button" id="clearSelectionButton">取消选择</button>
+            <span class="selection-tip">Ctrl 点击多选 · Shift 选择区间</span>
+          </div>
+
+          <div class="queue-column-head">
+            <span>#</span>
+            <span>曲目</span>
+            <span><svg><use href="#i-clock"></use></svg></span>
+          </div>
+
+          <div class="queue-list" id="queueList" tabindex="-1"></div>
+
+          <div class="queue-empty" id="queueEmpty">
+            <div class="queue-empty-art">
+              <span></span><span></span><span></span>
+              <svg><use href="#i-note"></use></svg>
+            </div>
+            <h3>队列还是空的</h3>
+            <p>点“添加”选择音乐，或把文件直接拖到这里。退出后队列会留在原处。</p>
+            <button class="outline-button" id="queueEmptyAddButton" type="button">
+              <svg><use href="#i-add"></use></svg>
+              选择本地音乐
+            </button>
+          </div>
+
+          <footer class="queue-footer">
+            <span><span id="queueTotalDuration">0 分钟</span> · 自动保存</span>
+            <button type="button" id="queueMenuButton" title="队列选项" aria-label="队列选项">
+              <svg><use href="#i-more"></use></svg>
+            </button>
+          </footer>
+        </aside>
+      </main>
+
+      <section class="spectrum-strip" id="spectrumStrip" aria-label="音频频谱">
+        <canvas id="spectrumCanvas"></canvas>
+        <div class="spectrum-label">
+          <span></span>
+          <b>实时频谱</b>
+          <small id="spectrumStatus">WAITING</small>
+        </div>
+      </section>
+
+      <footer class="player-dock">
+        <div class="progress-row">
+          <span class="timecode" id="currentTime">00:00</span>
+          <div class="progress-track-wrap">
+            <div class="progress-buffer" id="progressBuffer"></div>
+            <input
+              type="range"
+              id="progressSlider"
+              class="progress-slider"
+              min="0"
+              max="1000"
+              value="0"
+              step="1"
+              aria-label="播放进度"
+            />
+          </div>
+          <span class="timecode" id="durationTime">00:00</span>
+        </div>
+
+        <div class="player-grid">
+          <div class="dock-track">
+            <div class="dock-cover" id="dockCover">
+              <img id="dockCoverImage" alt="" />
+              <div class="dock-cover-fallback"><svg><use href="#i-note"></use></svg></div>
+            </div>
+            <div class="dock-track-copy">
+              <div class="dock-track-title" id="dockTrackTitle">还没有播放音乐</div>
+              <div class="dock-track-artist" id="dockTrackArtist">播放队列已自动保存</div>
+            </div>
+            <button class="dock-heart" id="dockMoreButton" type="button" title="在文件夹中显示" aria-label="在文件夹中显示">
+              <svg><use href="#i-more"></use></svg>
+            </button>
+          </div>
+
+          <div class="transport">
+            <button
+              class="transport-mode mode-button"
+              id="modeButton"
+              type="button"
+              title="顺序播放"
+              aria-label="切换播放模式"
+            >
+              <svg><use href="#i-repeat"></use></svg>
+              <span class="mode-badge" id="modeBadge">顺序</span>
+            </button>
+            <button class="transport-button" id="prevButton" type="button" title="上一首" aria-label="上一首">
+              <svg><use href="#i-prev"></use></svg>
+            </button>
+            <button class="transport-button seek-button" id="rewindButton" type="button" title="后退 10 秒" aria-label="后退 10 秒">
+              <svg><use href="#i-rewind"></use></svg>
+              <span class="seek-caption">10s</span>
+            </button>
+            <button class="play-button" id="playButton" type="button" title="播放" aria-label="播放">
+              <span class="play-button-ring"></span>
+              <svg class="icon-play"><use href="#i-play"></use></svg>
+              <svg class="icon-pause"><use href="#i-pause"></use></svg>
+            </button>
+            <button class="transport-button seek-button" id="forwardButton" type="button" title="前进 10 秒" aria-label="前进 10 秒">
+              <svg><use href="#i-forward"></use></svg>
+              <span class="seek-caption">10s</span>
+            </button>
+            <button class="transport-button" id="nextButton" type="button" title="下一首" aria-label="下一首">
+              <svg><use href="#i-next"></use></svg>
+            </button>
+            <button class="transport-mode" id="rateButton" type="button" title="播放速度" aria-label="播放速度">
+              <span class="rate-value" id="rateValue">1.0×</span>
+              <span class="mode-badge">速度</span>
+            </button>
+          </div>
+
+          <div class="dock-right">
+            <button class="dock-icon-button" id="volumeButton" type="button" title="静音" aria-label="静音">
+              <svg><use href="#i-volume"></use></svg>
+            </button>
+            <div class="volume-wrap">
+              <input
+                type="range"
+                id="volumeSlider"
+                class="volume-slider"
+                min="0"
+                max="100"
+                value="78"
+                step="1"
+                aria-label="音量"
+              />
+            </div>
+            <div class="dock-divider"></div>
+            <button
+              class="dock-icon-button desktop-lyrics-shortcut"
+              id="desktopLyricsShortcut"
+              type="button"
+              title="桌面歌词"
+              aria-label="桌面歌词"
+            >
+              <svg><use href="#i-lyrics"></use></svg>
+            </button>
+            <button
+              class="dock-icon-button settings-shortcut"
+              id="settingsButton"
+              type="button"
+              title="设置"
+              aria-label="打开设置"
+            >
+              <svg><use href="#i-settings"></use></svg>
+            </button>
+          </div>
+        </div>
+      </footer>
+
+      <div class="mode-popover" id="modePopover" hidden>
+        <div class="popover-heading">
+          <div>
+            <div class="eyebrow"><span></span> PLAY MODE</div>
+            <h3>播放方式</h3>
+          </div>
+          <button type="button" id="modePopoverClose" aria-label="关闭">
+            <svg><use href="#i-close"></use></svg>
+          </button>
+        </div>
+        <button class="mode-option" type="button" data-mode="sequential">
+          <span class="mode-option-icon"><svg><use href="#i-repeat"></use></svg></span>
+          <span><strong>顺序播放</strong><small>按队列从上到下播放，结束后从头继续</small></span>
+          <span class="mode-check"></span>
+        </button>
+        <button class="mode-option" type="button" data-mode="shuffle">
+          <span class="mode-option-icon"><svg><use href="#i-shuffle"></use></svg></span>
+          <span><strong>一轮随机</strong><small>优先未听歌曲，整轮听完后自动清空标记</small></span>
+          <span class="mode-check"></span>
+        </button>
+        <button class="mode-option" type="button" data-mode="repeat-one">
+          <span class="mode-option-icon"><svg><use href="#i-repeat-one"></use></svg></span>
+          <span><strong>单曲循环</strong><small>反复播放当前歌曲</small></span>
+          <span class="mode-check"></span>
+        </button>
+        <button class="mode-option" type="button" data-mode="selection">
+          <span class="mode-option-icon"><svg><use href="#i-repeat-selection"></use></svg></span>
+          <span><strong>循环选中</strong><small id="selectionModeHint">先在队列中选中歌曲</small></span>
+          <span class="mode-check"></span>
+        </button>
+      </div>
+
+      <div class="rate-popover" id="ratePopover" hidden>
+        <div class="popover-label">播放速度</div>
+        <div class="rate-options" id="rateOptions">
+          <button type="button" data-rate="0.75">0.75×</button>
+          <button type="button" data-rate="1" class="active">1.0×</button>
+          <button type="button" data-rate="1.25">1.25×</button>
+          <button type="button" data-rate="1.5">1.5×</button>
+          <button type="button" data-rate="1.75">1.75×</button>
+          <button type="button" data-rate="2">2.0×</button>
+        </div>
+      </div>
+
+      <div class="queue-menu" id="queueMenu" hidden>
+        <div class="popover-label">队列选项</div>
+        <button type="button" data-action="clear-markers">
+          <svg><use href="#i-unmark"></use></svg>清除全部已听标记
+        </button>
+        <button type="button" data-action="clear-queue">
+          <svg><use href="#i-trash"></use></svg>清空播放队列
+        </button>
+      </div>
+
+      <div class="sort-popover" id="sortPopover" role="menu" hidden>
+        <div class="popover-heading sort-popover-heading">
+          <div>
+            <div class="eyebrow"><span></span> SORT QUEUE</div>
+            <h3>队列排序</h3>
+          </div>
+          <button type="button" id="sortPopoverClose" aria-label="关闭">
+            <svg><use href="#i-close"></use></svg>
+          </button>
+        </div>
+        <button class="sort-option" type="button" data-sort="artist" role="menuitem">
+          <span class="sort-option-icon"><svg><use href="#i-sort-artist"></use></svg></span>
+          <span><strong>按歌手排序</strong><small>同一歌手的歌曲会排在一起，再按标题排列</small></span>
+          <span class="sort-check"></span>
+        </button>
+        <button class="sort-option" type="button" data-sort="title" role="menuitem">
+          <span class="sort-option-icon"><svg><use href="#i-sort-letter"></use></svg></span>
+          <span><strong>按首字母排序</strong><small>按歌名拼音或字母顺序排列</small></span>
+          <span class="sort-check"></span>
+        </button>
+        <button class="sort-option" type="button" data-sort="default" role="menuitem">
+          <span class="sort-option-icon"><svg><use href="#i-sort-time"></use></svg></span>
+          <span><strong>恢复默认顺序</strong><small>恢复为歌曲最初加入播放队列的顺序</small></span>
+          <span class="sort-check"></span>
+        </button>
+      </div>
+
+      <div class="confirm-dialog" id="confirmDialog" hidden>
+        <div class="confirm-card">
+          <div class="confirm-mark">
+            <svg><use href="#i-trash"></use></svg>
+          </div>
+          <h3 id="confirmTitle">确定清空队列？</h3>
+          <p id="confirmMessage">队列和其中的已听标记都会被清除。此操作无法撤销。</p>
+          <div class="confirm-actions">
+            <button class="quiet-button" id="confirmCancel" type="button">取消</button>
+            <button class="danger-button" id="confirmAccept" type="button">确定</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-backdrop" id="settingsBackdrop" hidden>
+        <section class="settings-panel" id="settingsPanel" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+          <header class="settings-header">
+            <div>
+              <div class="eyebrow"><span></span> SETTINGS</div>
+              <h2 id="settingsTitle">设置</h2>
+            </div>
+            <button class="settings-close" id="settingsCloseButton" type="button" aria-label="关闭设置">
+              <svg><use href="#i-close"></use></svg>
+            </button>
+          </header>
+
+          <div class="settings-scroll">
+            <section class="settings-section">
+              <div class="settings-section-heading">
+                <span>播放</span>
+                <small>PLAYBACK</small>
+              </div>
+
+              <div class="setting-row">
+                <div class="setting-copy">
+                  <strong>默认倍速</strong>
+                  <small>每次启动聆音时使用的初始播放速度</small>
+                </div>
+                <div class="settings-segmented" id="settingsRateOptions">
+                  <button type="button" data-settings-rate="0.75">0.75×</button>
+                  <button type="button" data-settings-rate="1">1.0×</button>
+                  <button type="button" data-settings-rate="1.25">1.25×</button>
+                  <button type="button" data-settings-rate="1.5">1.5×</button>
+                  <button type="button" data-settings-rate="2">2.0×</button>
+                </div>
+              </div>
+
+              <div class="setting-row">
+                <div class="setting-copy">
+                  <strong>默认音量</strong>
+                  <small>启动时使用，调整后会立即应用</small>
+                </div>
+                <div class="settings-slider">
+                  <input type="range" id="settingsVolumeSlider" min="0" max="100" value="78" step="1" aria-label="默认音量" />
+                  <span id="settingsVolumeValue">78%</span>
+                </div>
+              </div>
+
+              <div class="setting-row">
+                <div class="setting-copy">
+                  <strong>实时频谱</strong>
+                  <small>关闭后隐藏播放栏上方的音频响应柱状图</small>
+                </div>
+                <label class="switch-control">
+                  <input type="checkbox" id="settingsSpectrumToggle" checked />
+                  <span class="switch-track"><span></span></span>
+                </label>
+              </div>
+            </section>
+
+            <section class="settings-section">
+              <div class="settings-section-heading">
+                <span>Windows 集成</span>
+                <small>WINDOWS</small>
+              </div>
+              <div class="settings-integration">
+                <div class="integration-copy">
+                  <strong>默认音频播放器</strong>
+                  <small id="defaultPlayerStatus">正在检查文件关联状态…</small>
+                </div>
+                <button class="settings-action-button" id="defaultPlayerButton" type="button">
+                  <svg><use href="#i-external"></use></svg>
+                  打开默认应用设置
+                </button>
+              </div>
+              <p class="settings-note">
+                Windows 10/11 要求由用户本人在系统界面确认默认应用。聆音会先把 MP3、FLAC、WAV 等格式登记到“打开方式”，再直接打开对应的系统设置页。
+              </p>
+            </section>
+
+            <section class="settings-section">
+              <div class="settings-section-heading">
+                <span>关闭按钮行为</span>
+                <small>CLOSE ACTION</small>
+              </div>
+              <div class="close-action-grid" id="settingsCloseOptions">
+                <button type="button" data-close-action="ask">
+                  <span class="close-action-icon"><svg><use href="#i-more"></use></svg></span>
+                  <span><strong>每次询问</strong><small>点击关闭时显示选择弹窗</small></span>
+                </button>
+                <button type="button" data-close-action="tray">
+                  <span class="close-action-icon"><svg><use href="#i-tray"></use></svg></span>
+                  <span><strong>最小化到托盘</strong><small>音乐继续播放，应用留在任务栏托盘</small></span>
+                </button>
+                <button type="button" data-close-action="quit">
+                  <span class="close-action-icon"><svg><use href="#i-power"></use></svg></span>
+                  <span><strong>完全退出</strong><small>停止播放并结束聆音进程</small></span>
+                </button>
+              </div>
+            </section>
+
+            <section class="settings-section app-info-section">
+              <div class="settings-section-heading">
+                <span>应用信息</span>
+                <small>ABOUT</small>
+              </div>
+              <div class="app-info-brand">
+                <div class="app-info-mark"><span></span><span></span><span></span><span></span></div>
+                <div>
+                  <strong>聆音 <em>Lingyin</em></strong>
+                  <small>为本地音乐保留一条不会丢失的聆听路径</small>
+                </div>
+              </div>
+              <dl class="app-info-list">
+                <div><dt>版本</dt><dd id="settingsAppVersion">V 0.3.0</dd></div>
+                <div><dt>作者</dt><dd>Iris Li</dd></div>
+                <div><dt>联系</dt><dd>lhxttsbx@gmail.com</dd></div>
+                <div><dt>技术</dt><dd>Electron · Chromium · music-metadata</dd></div>
+                <div><dt>许可</dt><dd>保留所有权利，详见 LICENSE</dd></div>
+              </dl>
+              <button class="settings-data-button" id="openUserDataButton" type="button">
+                <svg><use href="#i-folder"></use></svg>
+                打开应用数据目录
+              </button>
+            </section>
+          </div>
+        </section>
+      </div>
+
+      <div class="close-dialog-backdrop" id="closeDialog" hidden>
+        <section class="close-dialog-card" role="dialog" aria-modal="true" aria-labelledby="closeDialogTitle">
+          <div class="close-dialog-mark"><svg><use href="#i-power"></use></svg></div>
+          <h2 id="closeDialogTitle">要关闭聆音吗？</h2>
+          <p>选择一个关闭方式。无论选哪一项，播放队列和已听标记都会自动保存。</p>
+          <div class="close-choice-list">
+            <label class="close-choice">
+              <input type="radio" name="closeChoice" value="tray" checked />
+              <span class="close-choice-radio"></span>
+              <span class="close-choice-icon"><svg><use href="#i-tray"></use></svg></span>
+              <span><strong>最小化到托盘</strong><small>窗口隐藏，当前播放不会中断</small></span>
+            </label>
+            <label class="close-choice">
+              <input type="radio" name="closeChoice" value="quit" />
+              <span class="close-choice-radio"></span>
+              <span class="close-choice-icon"><svg><use href="#i-power"></use></svg></span>
+              <span><strong>完全退出程序</strong><small>停止播放并结束聆音进程</small></span>
+            </label>
+          </div>
+          <label class="remember-close-choice">
+            <input type="checkbox" id="rememberCloseChoice" />
+            <span class="remember-checkbox"></span>
+            记住我此次的选择，以后不再提示
+          </label>
+          <div class="close-dialog-actions">
+            <button class="quiet-button" id="closeDialogCancel" type="button">取消</button>
+            <button class="accent-button" id="closeDialogConfirm" type="button">确认</button>
+          </div>
+        </section>
+      </div>
+
+      <div class="toast-stack" id="toastStack" aria-live="polite"></div>
+    </div>
+
+    <audio id="audio" crossorigin="anonymous"></audio>
+    <script src="./app.js"></script>
+  </body>
+</html>
