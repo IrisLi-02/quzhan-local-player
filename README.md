@@ -78,6 +78,16 @@ npm run dist
 
 安装包和便携版会生成在 `dist/`，GitHub 发布时建议放入 Release，而不是直接提交到仓库。
 
+## 一键发布到 GitHub
+
+项目已经包含 `一键发布.ps1`。在 PowerShell 中运行：
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File "C:\Users\14911\Desktop\曲栈\一键发布.ps1"
+```
+
+第一次运行会在浏览器中打开 GitHub 登录，之后脚本会创建公开仓库、推送源码，并把 Windows 安装包上传到 Release。需要跳过 GitHub 登录检查时，也可以按照 [docs/GITHUB_发布指南.md](docs/GITHUB_发布指南.md) 手动操作。
+
 ## Windows 默认播放器说明
 
 Windows 10/11 不允许普通应用静默修改默认文件关联。这是操作系统的用户保护机制，不是曲栈没有实现。

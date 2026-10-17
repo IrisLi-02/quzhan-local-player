@@ -2,6 +2,8 @@ node_modules/
 dist/
 release/
 work/
+library.json
+covers/
 *.log
 *.tmp
 .DS_Store
@@ -15,6 +17,7 @@ __pycache__/
 *.mp3
 *.flac
 *.m4a
+*.m4b
 *.wav
 *.ogg
 *.opus
