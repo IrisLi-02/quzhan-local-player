@@ -1,8 +1,15 @@
 ﻿$ErrorActionPreference = "Stop"
 Set-Location -LiteralPath $PSScriptRoot
 
+[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
+$OutputEncoding = New-Object System.Text.UTF8Encoding($false)
+
 $repoName = "quzhan-local-player"
-$package = Get-Content -LiteralPath ".\package.json" -Raw | ConvertFrom-Json
+$packageText = [System.IO.File]::ReadAllText(
+  (Join-Path $PSScriptRoot "package.json"),
+  [System.Text.Encoding]::UTF8
+)
+$package = $packageText | ConvertFrom-Json
 $version = $package.version
 $tag = "v$version"
 $setupFile = ".\release\Quzhan-Setup-$version-x64.exe"
