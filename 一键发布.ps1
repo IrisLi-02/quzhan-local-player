@@ -1,4 +1,4 @@
-﻿$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Continue"
 Set-Location -LiteralPath $PSScriptRoot
 
 [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
@@ -55,9 +55,15 @@ if ($forbidden) {
 Write-Host ""
 Write-Host "检查并提交最新源码..." -ForegroundColor Cyan
 git add .
+if ($LASTEXITCODE -ne 0) {
+  throw "git add 失败，发布已停止。"
+}
 $pending = git status --porcelain
 if ($pending) {
   git commit -m "Release Quzhan $version"
+  if ($LASTEXITCODE -ne 0) {
+    throw "git commit 失败，发布已停止。"
+  }
 }
 
 $remoteUrl = git remote get-url origin 2>$null
@@ -74,6 +80,9 @@ if ($LASTEXITCODE -ne 0 -or -not $remoteUrl) {
   }
   Write-Host "推送源码到 GitHub..." -ForegroundColor Cyan
   git push -u origin main
+  if ($LASTEXITCODE -ne 0) {
+    throw "推送源码失败，请检查网络和 GitHub 登录状态。"
+  }
 }
 
 & gh repo edit $fullRepo `
