@@ -1,4 +1,4 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 Set-Location -LiteralPath $PSScriptRoot
 
 $repoName = "quzhan-local-player"

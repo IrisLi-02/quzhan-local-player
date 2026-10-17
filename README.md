@@ -83,7 +83,7 @@ npm run dist
 项目已经包含 `一键发布.ps1`。在 PowerShell 中运行：
 
 ```powershell
-pwsh -NoProfile -ExecutionPolicy Bypass -File "C:\Users\14911\Desktop\曲栈\一键发布.ps1"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Users\14911\Desktop\曲栈\一键发布.ps1"
 ```
 
 第一次运行会在浏览器中打开 GitHub 登录，之后脚本会创建公开仓库、推送源码，并把 Windows 安装包上传到 Release。需要跳过 GitHub 登录检查时，也可以按照 [docs/GITHUB_发布指南.md](docs/GITHUB_发布指南.md) 手动操作。
