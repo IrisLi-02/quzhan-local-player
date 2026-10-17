@@ -1,6 +1,6 @@
 # Third-Party Notices
 
-聆音 uses the following open-source components. Their licenses apply to those
+曲栈 uses the following open-source components. Their licenses apply to those
 components; the project is not claiming ownership of them.
 
 | Component | Purpose | License |

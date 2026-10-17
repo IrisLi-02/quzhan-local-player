@@ -33,13 +33,13 @@
     ${NSD_CreateLabel} 0 0 100% 34u "以下选项默认均不勾选。开始菜单快捷方式会正常创建。"
     Pop $0
 
-    ${NSD_CreateCheckbox} 0 42u 100% 20u "在桌面创建“聆音”快捷方式"
+    ${NSD_CreateCheckbox} 0 42u 100% 20u "在桌面创建“曲栈”快捷方式"
     Pop $DesktopShortcutCheckbox
     ${If} $DesktopShortcutWanted == "1"
       ${NSD_Check} $DesktopShortcutCheckbox
     ${EndIf}
 
-    ${NSD_CreateCheckbox} 0 68u 100% 20u "将聆音设为默认音频播放器（安装后打开 Windows 确认页）"
+    ${NSD_CreateCheckbox} 0 68u 100% 20u "将曲栈设为默认音频播放器（安装后打开 Windows 确认页）"
     Pop $DefaultPlayerCheckbox
     ${If} $DefaultPlayerWanted == "1"
       ${NSD_Check} $DefaultPlayerCheckbox
@@ -68,6 +68,17 @@
 !endif
 
 !macro customInstall
+  ReadRegStr $R9 HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\e1a67e1a-f974-5ff5-9e51-0a6644ead54f" QuietUninstallString
+  ${If} $R9 == ""
+    ReadRegStr $R9 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\e1a67e1a-f974-5ff5-9e51-0a6644ead54f" QuietUninstallString
+  ${EndIf}
+  ${If} $R9 != ""
+    ExecWait '$R9'
+  ${EndIf}
+  Delete "$DESKTOP\聆音.lnk"
+  Delete "$SMPROGRAMS\聆音.lnk"
+  RMDir "$SMPROGRAMS\聆音"
+
   ${If} $DesktopShortcutWanted == "1"
     CreateShortCut "$DESKTOP\${SHORTCUT_NAME}.lnk" "$INSTDIR\${APP_EXECUTABLE_FILENAME}" "" "$INSTDIR\${APP_EXECUTABLE_FILENAME}" 0 "" "" "${APP_DESCRIPTION}"
     ClearErrors
@@ -81,6 +92,21 @@
 !macro customUnInstall
   ${IfNot} ${isUpdated}
     Delete "$DESKTOP\${SHORTCUT_NAME}.lnk"
+    DeleteRegValue HKCU "Software\RegisteredApplications" "Quzhan"
+    DeleteRegKey HKCU "Software\Quzhan\Capabilities"
+    DeleteRegKey HKCU "Software\Classes\Quzhan.Audio"
+    DeleteRegKey HKCU "Software\Classes\Applications\曲栈.exe"
+    DeleteRegValue HKCU "Software\Classes\.mp3\OpenWithProgids" "Quzhan.Audio"
+    DeleteRegValue HKCU "Software\Classes\.flac\OpenWithProgids" "Quzhan.Audio"
+    DeleteRegValue HKCU "Software\Classes\.m4a\OpenWithProgids" "Quzhan.Audio"
+    DeleteRegValue HKCU "Software\Classes\.aac\OpenWithProgids" "Quzhan.Audio"
+    DeleteRegValue HKCU "Software\Classes\.wav\OpenWithProgids" "Quzhan.Audio"
+    DeleteRegValue HKCU "Software\Classes\.ogg\OpenWithProgids" "Quzhan.Audio"
+    DeleteRegValue HKCU "Software\Classes\.oga\OpenWithProgids" "Quzhan.Audio"
+    DeleteRegValue HKCU "Software\Classes\.opus\OpenWithProgids" "Quzhan.Audio"
+    DeleteRegValue HKCU "Software\Classes\.webm\OpenWithProgids" "Quzhan.Audio"
+    DeleteRegValue HKCU "Software\Classes\.aiff\OpenWithProgids" "Quzhan.Audio"
+    DeleteRegValue HKCU "Software\Classes\.aif\OpenWithProgids" "Quzhan.Audio"
     DeleteRegValue HKCU "Software\RegisteredApplications" "Lingyin"
     DeleteRegKey HKCU "Software\Lingyin\Capabilities"
     DeleteRegKey HKCU "Software\Classes\Lingyin.Audio"

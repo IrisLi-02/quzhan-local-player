@@ -24,7 +24,7 @@ const execFileAsync = promisify(execFile);
 
 protocol.registerSchemesAsPrivileged([
   {
-    scheme: 'lingyin-media',
+    scheme: 'quzhan-media',
     privileges: {
       standard: true,
       secure: true,
@@ -52,11 +52,46 @@ const AUDIO_EXTENSIONS = new Set([
 ]);
 
 const OPEN_WITH_EXTENSIONS = [...AUDIO_EXTENSIONS].map((extension) => extension.slice(1));
-const ASSOCIATION_PROG_ID = 'Lingyin.Audio';
-const ASSOCIATION_APP_NAME = 'Lingyin';
+const ASSOCIATION_PROG_ID = 'Quzhan.Audio';
+const ASSOCIATION_APP_NAME = 'Quzhan';
+const LEGACY_ASSOCIATION_PROG_ID = 'Lingyin.Audio';
+const LEGACY_ASSOCIATION_APP_NAME = 'Lingyin';
 
-if (process.env.LINGYIN_DATA_DIR) {
-  app.setPath('userData', path.resolve(process.env.LINGYIN_DATA_DIR));
+if (process.env.QUZHAN_DATA_DIR) {
+  app.setPath('userData', path.resolve(process.env.QUZHAN_DATA_DIR));
+} else if (app.isPackaged) {
+  const appDataDir = app.getPath('appData');
+  const targetUserData = path.join(appDataDir, 'quzhan-player');
+  const legacyUserDataDirs = [
+    path.join(appDataDir, 'lingyin-player'),
+    path.join(appDataDir, '聆音'),
+    path.join(appDataDir, 'Lingyin'),
+  ];
+  try {
+    fs.mkdirSync(targetUserData, { recursive: true });
+    if (!fs.existsSync(path.join(targetUserData, 'library.json'))) {
+      for (const legacyDir of legacyUserDataDirs) {
+        const legacyLibrary = path.join(legacyDir, 'library.json');
+        if (fs.existsSync(legacyLibrary)) {
+          fs.copyFileSync(legacyLibrary, path.join(targetUserData, 'library.json'));
+          break;
+        }
+      }
+    }
+    for (const legacyDir of legacyUserDataDirs) {
+      const legacyCovers = path.join(legacyDir, 'covers');
+      if (fs.existsSync(legacyCovers)) {
+        fs.cpSync(legacyCovers, path.join(targetUserData, 'covers'), {
+          recursive: true,
+          force: false,
+          errorOnExist: false,
+        });
+      }
+    }
+  } catch (error) {
+    console.warn('Unable to migrate previous app data:', error);
+  }
+  app.setPath('userData', targetUserData);
 }
 
 const MIME_TYPES = {
@@ -518,7 +553,7 @@ function createMediaResponse(filePath, request) {
 }
 
 function registerMediaProtocol() {
-  protocol.handle('lingyin-media', async (request) => {
+  protocol.handle('quzhan-media', async (request) => {
     try {
       const url = new URL(request.url);
       const filePath = url.searchParams.get('path');
@@ -668,9 +703,34 @@ async function regQueryValue(key, valueName) {
   }
 }
 
+async function removeLegacyAudioAssociations() {
+  if (process.platform !== 'win32' || !app.isPackaged) return;
+  const bestEffort = (args) =>
+    execFileAsync('reg.exe', args, { windowsHide: true }).catch(() => {});
+  await bestEffort([
+    'delete',
+    'HKCU\\Software\\RegisteredApplications',
+    '/v',
+    LEGACY_ASSOCIATION_APP_NAME,
+    '/f',
+  ]);
+  await bestEffort(['delete', 'HKCU\\Software\\Lingyin\\Capabilities', '/f']);
+  await bestEffort(['delete', `HKCU\\Software\\Classes\\${LEGACY_ASSOCIATION_PROG_ID}`, '/f']);
+  await bestEffort(['delete', 'HKCU\\Software\\Classes\\Applications\\聆音.exe', '/f']);
+  for (const extension of OPEN_WITH_EXTENSIONS) {
+    await bestEffort([
+      'delete',
+      `HKCU\\Software\\Classes\\.${extension}\\OpenWithProgids`,
+      '/v',
+      LEGACY_ASSOCIATION_PROG_ID,
+      '/f',
+    ]);
+  }
+}
+
 async function registerAudioAssociations() {
   if (process.platform !== 'win32') return { ok: false, skipped: true };
-  if (!app.isPackaged && process.env.LINGYIN_FORCE_ASSOCIATIONS !== '1') {
+  if (!app.isPackaged && process.env.QUZHAN_FORCE_ASSOCIATIONS !== '1') {
     return { ok: false, skipped: true };
   }
   const executable = associationExecutablePath();
@@ -682,13 +742,13 @@ async function registerAudioAssociations() {
       `HKCU\\Software\\Classes\\${ASSOCIATION_PROG_ID}`,
       '',
       'REG_SZ',
-      '聆音',
+      '曲栈',
     );
     await regAdd(
       `HKCU\\Software\\Classes\\${ASSOCIATION_PROG_ID}`,
       'FriendlyTypeName',
       'REG_SZ',
-      '聆音音频文件',
+      '曲栈音频文件',
     );
     await regAdd(
       `HKCU\\Software\\Classes\\${ASSOCIATION_PROG_ID}\\DefaultIcon`,
@@ -700,7 +760,7 @@ async function registerAudioAssociations() {
       `HKCU\\Software\\Classes\\Applications\\${executableName}`,
       'FriendlyAppName',
       'REG_SZ',
-      '聆音',
+      '曲栈',
     );
     await regAdd(
       `HKCU\\Software\\Classes\\Applications\\${executableName}\\DefaultIcon`,
@@ -724,7 +784,7 @@ async function registerAudioAssociations() {
       `HKCU\\Software\\Classes\\${ASSOCIATION_PROG_ID}\\Application`,
       'ApplicationName',
       'REG_SZ',
-      '聆音',
+      '曲栈',
     );
     await regAdd(
       `HKCU\\Software\\Classes\\${ASSOCIATION_PROG_ID}\\Application`,
@@ -741,7 +801,7 @@ async function registerAudioAssociations() {
         '',
       );
       await regAdd(
-        'HKCU\\Software\\Lingyin\\Capabilities\\FileAssociations',
+        'HKCU\\Software\\Quzhan\\Capabilities\\FileAssociations',
         `.${extension}`,
         'REG_SZ',
         ASSOCIATION_PROG_ID,
@@ -749,19 +809,19 @@ async function registerAudioAssociations() {
     }
 
     await regAdd(
-      'HKCU\\Software\\Lingyin\\Capabilities',
+      'HKCU\\Software\\Quzhan\\Capabilities',
       'ApplicationName',
       'REG_SZ',
-      '聆音',
+      '曲栈',
     );
     await regAdd(
-      'HKCU\\Software\\Lingyin\\Capabilities',
+      'HKCU\\Software\\Quzhan\\Capabilities',
       'ApplicationDescription',
       'REG_SZ',
-      '聆音本地音乐播放器',
+      '曲栈本地音乐播放器',
     );
     await regAdd(
-      'HKCU\\Software\\Lingyin\\Capabilities',
+      'HKCU\\Software\\Quzhan\\Capabilities',
       'ApplicationIcon',
       'REG_SZ',
       icon,
@@ -770,7 +830,7 @@ async function registerAudioAssociations() {
       'HKCU\\Software\\RegisteredApplications',
       ASSOCIATION_APP_NAME,
       'REG_SZ',
-      'Software\\Lingyin\\Capabilities',
+      'Software\\Quzhan\\Capabilities',
     );
     execFile('ie4uinit.exe', ['-show'], { windowsHide: true }, () => {});
     return { ok: true, executable };
@@ -820,14 +880,14 @@ async function openDefaultAppsSettings() {
     }
     return {
       ok: true,
-      message: '已打开 Windows 默认应用设置，请在系统界面确认聆音。',
+      message: '已打开 Windows 默认应用设置，请在系统界面确认曲栈。',
     };
   } catch (error) {
     try {
       await shell.openExternal('ms-settings:defaultapps');
       return {
         ok: true,
-        message: '已打开 Windows 默认应用设置，请在系统界面确认聆音。',
+        message: '已打开 Windows 默认应用设置，请在系统界面确认曲栈。',
       };
     } catch {
       return { ok: false, message: `无法打开 Windows 设置：${error.message}` };
@@ -859,10 +919,10 @@ function createTray() {
     let icon = nativeImage.createFromPath(trayIconPath);
     if (!icon.isEmpty()) icon = icon.resize({ width: 16, height: 16 });
     tray = new Tray(icon);
-    tray.setToolTip('聆音');
+    tray.setToolTip('曲栈');
     tray.setContextMenu(
       Menu.buildFromTemplate([
-        { label: '打开聆音', click: showMainWindow },
+        { label: '打开曲栈', click: showMainWindow },
         { type: 'separator' },
         { label: '播放 / 暂停', click: () => sendTrayAction('toggle-play') },
         { label: '上一首', click: () => sendTrayAction('previous') },
@@ -873,7 +933,7 @@ function createTray() {
         } },
         { type: 'separator' },
         {
-          label: '退出聆音',
+          label: '退出曲栈',
           click: () => {
             quitting = true;
             app.quit();
@@ -910,7 +970,7 @@ function createMainWindow() {
     frame: false,
     show: false,
     backgroundColor: '#080b10',
-    title: '聆音',
+    title: '曲栈',
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
@@ -963,7 +1023,7 @@ function createMainWindow() {
       }
     }, 700);
   });
-  if (process.env.LINGYIN_DEV_LOG) {
+  if (process.env.QUZHAN_DEV_LOG) {
     mainWindow.webContents.on('console-message', (details) => {
       console.log(
         `[renderer:${details.level}] ${details.message} (${details.sourceId}:${details.lineNumber})`,
@@ -977,11 +1037,11 @@ function createMainWindow() {
     });
   }
 
-  if (process.env.LINGYIN_CAPTURE_PATH) {
+  if (process.env.QUZHAN_CAPTURE_PATH) {
     mainWindow.webContents.once('did-finish-load', async () => {
       setTimeout(async () => {
         try {
-          if (process.env.LINGYIN_SMOKE_QUEUE === '1') {
+          if (process.env.QUZHAN_SMOKE_QUEUE === '1') {
             const queueResult = await mainWindow.webContents.executeJavaScript(`
               (async () => {
                 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -1002,7 +1062,7 @@ function createMainWindow() {
             `);
             console.log('Smoke queue:', queueResult);
           }
-          if (process.env.LINGYIN_SMOKE_DRAG === '1') {
+          if (process.env.QUZHAN_SMOKE_DRAG === '1') {
             const dragResult = await mainWindow.webContents.executeJavaScript(`
               (async () => {
                 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -1044,7 +1104,7 @@ function createMainWindow() {
             `);
             console.log('Smoke drag:', dragResult);
           }
-          if (process.env.LINGYIN_SMOKE_SORT === '1') {
+          if (process.env.QUZHAN_SMOKE_SORT === '1') {
             const sortResult = await mainWindow.webContents.executeJavaScript(`
               (async () => {
                 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -1074,7 +1134,7 @@ function createMainWindow() {
             `);
             console.log('Smoke sort:', sortResult);
           }
-          if (process.env.LINGYIN_SMOKE_SHUFFLE === '1') {
+          if (process.env.QUZHAN_SMOKE_SHUFFLE === '1') {
             const shuffleResult = await mainWindow.webContents.executeJavaScript(`
               (async () => {
                 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -1091,7 +1151,7 @@ function createMainWindow() {
             `);
             console.log('Smoke shuffle:', shuffleResult);
           }
-          if (process.env.LINGYIN_SMOKE_PLAY) {
+          if (process.env.QUZHAN_SMOKE_PLAY) {
             const playback = await mainWindow.webContents.executeJavaScript(`
               (async () => {
                 document.getElementById('playButton').click();
@@ -1107,7 +1167,7 @@ function createMainWindow() {
             `);
             console.log('Smoke playback:', playback);
           }
-          if (process.env.LINGYIN_SMOKE_SEEK === '1') {
+          if (process.env.QUZHAN_SMOKE_SEEK === '1') {
             const seekResult = await mainWindow.webContents.executeJavaScript(`
               (async () => {
                 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -1126,7 +1186,7 @@ function createMainWindow() {
             `);
             console.log('Smoke seek:', seekResult);
           }
-          if (process.env.LINGYIN_SMOKE_SETTINGS === '1') {
+          if (process.env.QUZHAN_SMOKE_SETTINGS === '1') {
             const settingsResult = await mainWindow.webContents.executeJavaScript(`
               (async () => {
                 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -1142,7 +1202,7 @@ function createMainWindow() {
             `);
             console.log('Smoke settings:', settingsResult);
           }
-          if (process.env.LINGYIN_SMOKE_SETTINGS_CHANGE === '1') {
+          if (process.env.QUZHAN_SMOKE_SETTINGS_CHANGE === '1') {
             const settingsResult = await mainWindow.webContents.executeJavaScript(`
               (async () => {
                 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -1169,7 +1229,7 @@ function createMainWindow() {
             `);
             console.log('Smoke settings change:', settingsResult);
           }
-          if (process.env.LINGYIN_SMOKE_CLOSE_DIALOG === '1') {
+          if (process.env.QUZHAN_SMOKE_CLOSE_DIALOG === '1') {
             const closeResult = await mainWindow.webContents.executeJavaScript(`
               (async () => {
                 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -1183,7 +1243,7 @@ function createMainWindow() {
             `);
             console.log('Smoke close dialog:', closeResult);
           }
-          if (process.env.LINGYIN_SMOKE_CONFIRM_TRAY === '1') {
+          if (process.env.QUZHAN_SMOKE_CONFIRM_TRAY === '1') {
             const closeResult = await mainWindow.webContents.executeJavaScript(`
               (async () => {
                 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -1201,7 +1261,7 @@ function createMainWindow() {
             `);
             console.log('Smoke confirm tray:', closeResult, 'windowVisible:', mainWindow.isVisible());
           }
-          if (process.env.LINGYIN_SMOKE_CLOSE_AUTO === '1') {
+          if (process.env.QUZHAN_SMOKE_CLOSE_AUTO === '1') {
             const closeResult = await mainWindow.webContents.executeJavaScript(`
               (async () => {
                 document.getElementById('windowClose').click();
@@ -1211,28 +1271,28 @@ function createMainWindow() {
             `);
             console.log('Smoke remembered close:', closeResult, 'windowVisible:', mainWindow.isVisible());
           }
-          if (process.env.LINGYIN_CAPTURE_OVERLAY_PATH) {
+          if (process.env.QUZHAN_CAPTURE_OVERLAY_PATH) {
             await mainWindow.webContents.executeJavaScript(
               `document.getElementById('desktopLyricsButton').click()`,
             );
             await new Promise((resolve) => setTimeout(resolve, 1000));
             if (overlayWindow && !overlayWindow.isDestroyed()) {
               const overlayImage = await overlayWindow.webContents.capturePage();
-              await fsp.writeFile(process.env.LINGYIN_CAPTURE_OVERLAY_PATH, overlayImage.toPNG());
-              console.log(`Overlay screenshot saved to ${process.env.LINGYIN_CAPTURE_OVERLAY_PATH}`);
+              await fsp.writeFile(process.env.QUZHAN_CAPTURE_OVERLAY_PATH, overlayImage.toPNG());
+              console.log(`Overlay screenshot saved to ${process.env.QUZHAN_CAPTURE_OVERLAY_PATH}`);
             } else {
               console.error('Overlay window was not created');
             }
           }
           const image = await mainWindow.webContents.capturePage();
-          await fsp.writeFile(process.env.LINGYIN_CAPTURE_PATH, image.toPNG());
-          console.log(`Screenshot saved to ${process.env.LINGYIN_CAPTURE_PATH}`);
+          await fsp.writeFile(process.env.QUZHAN_CAPTURE_PATH, image.toPNG());
+          console.log(`Screenshot saved to ${process.env.QUZHAN_CAPTURE_PATH}`);
         } catch (error) {
           console.error('Screenshot failed:', error);
         } finally {
           app.quit();
         }
-      }, Number(process.env.LINGYIN_CAPTURE_DELAY || 1200));
+      }, Number(process.env.QUZHAN_CAPTURE_DELAY || 1200));
     });
   }
 }
@@ -1452,7 +1512,7 @@ app.on('second-instance', (_event, commandLine) => {
 });
 
 app.whenReady().then(async () => {
-  app.setAppUserModelId('com.lingyin.player');
+  app.setAppUserModelId('com.irisli.quzhan');
   pendingOpenPaths = extractAudioPathsFromArgv(process.argv.slice(1));
   pendingOpenDefaultSettings = process.argv.includes('--open-default-apps');
   stateFile = path.join(app.getPath('userData'), 'library.json');
@@ -1467,11 +1527,14 @@ app.whenReady().then(async () => {
   registerAudioAssociations().catch((error) => {
     console.warn('Unable to register audio file associations:', error);
   });
+  removeLegacyAudioAssociations().catch((error) => {
+    console.warn('Unable to clean up legacy file associations:', error);
+  });
 
-  if (process.env.LINGYIN_SMOKE_AUDIO) {
+  if (process.env.QUZHAN_SMOKE_AUDIO) {
     mainWindow.webContents.once('did-finish-load', () => {
       setTimeout(() => {
-        mainWindow.webContents.send('smoke:import', process.env.LINGYIN_SMOKE_AUDIO);
+        mainWindow.webContents.send('smoke:import', process.env.QUZHAN_SMOKE_AUDIO);
       }, 400);
     });
   }

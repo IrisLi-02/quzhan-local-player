@@ -1,6 +1,6 @@
 const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
-contextBridge.exposeInMainWorld('lingyin', {
+contextBridge.exposeInMainWorld('quzhan', {
   platform: process.platform,
   mediaBaseUrl: ipcRenderer.sendSync('media:origin'),
   getState: () => ipcRenderer.invoke('app:get-state'),

@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const api = window.lingyin;
+  const api = window.quzhan;
   const audio = document.getElementById('audio');
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -207,7 +207,7 @@
     return filePath
       ? api.mediaBaseUrl
         ? `${api.mediaBaseUrl}/media?path=${encodeURIComponent(filePath)}`
-        : `lingyin-media://local/?path=${encodeURIComponent(filePath)}`
+        : `quzhan-media://local/?path=${encodeURIComponent(filePath)}`
       : '';
   }
 
@@ -575,7 +575,7 @@
       if (!associationStatus?.registered) {
         els.defaultPlayerStatus.textContent = '尚未在 Windows 中登记，点击右侧按钮完成登记';
       } else if (associationStatus.allDefault) {
-        els.defaultPlayerStatus.textContent = '聆音已是全部支持格式的默认播放器';
+        els.defaultPlayerStatus.textContent = '曲栈已是全部支持格式的默认播放器';
       } else if (associationStatus.defaultCount > 0) {
         els.defaultPlayerStatus.textContent =
           `已关联 ${associationStatus.defaultCount} / ${associationStatus.total} 种音频格式`;
@@ -593,7 +593,7 @@
       await api.registerAssociations();
       const result = await api.openDefaultAppsSettings();
       showToast(
-        result?.message || '已打开 Windows 默认应用设置，请在系统界面确认聆音',
+        result?.message || '已打开 Windows 默认应用设置，请在系统界面确认曲栈',
         { duration: 4600, error: !result?.ok },
       );
       setTimeout(refreshAssociationStatus, 900);

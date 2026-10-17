@@ -4,10 +4,10 @@
     <meta charset="UTF-8" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: lingyin-media: http://127.0.0.1:*; media-src 'self' blob: lingyin-media: http://127.0.0.1:*; font-src 'self' data:; connect-src 'self' http://127.0.0.1:*;"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: quzhan-media: http://127.0.0.1:*; media-src 'self' blob: quzhan-media: http://127.0.0.1:*; font-src 'self' data:; connect-src 'self' http://127.0.0.1:*;"
     />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>聆音</title>
+    <title>曲栈</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
@@ -174,8 +174,8 @@
           <div class="brand-mark">
             <span></span><span></span><span></span><span></span>
           </div>
-          <div class="brand-name">聆音</div>
-          <div class="app-version" id="appVersion">V 0.3.0</div>
+          <div class="brand-name">曲栈</div>
+          <div class="app-version" id="appVersion">V 0.4.0</div>
           <div class="brand-edition">LOCAL / 01</div>
         </div>
         <div class="titlebar-center" id="titlebarCenter">把每一次聆听留在原处</div>
@@ -646,7 +646,7 @@
               <div class="setting-row">
                 <div class="setting-copy">
                   <strong>默认倍速</strong>
-                  <small>每次启动聆音时使用的初始播放速度</small>
+                  <small>每次启动曲栈时使用的初始播放速度</small>
                 </div>
                 <div class="settings-segmented" id="settingsRateOptions">
                   <button type="button" data-settings-rate="0.75">0.75×</button>
@@ -696,7 +696,7 @@
                 </button>
               </div>
               <p class="settings-note">
-                Windows 10/11 要求由用户本人在系统界面确认默认应用。聆音会先把 MP3、FLAC、WAV 等格式登记到“打开方式”，再直接打开对应的系统设置页。
+                Windows 10/11 要求由用户本人在系统界面确认默认应用。曲栈会先把 MP3、FLAC、WAV 等格式登记到“打开方式”，再直接打开对应的系统设置页。
               </p>
             </section>
 
@@ -716,7 +716,7 @@
                 </button>
                 <button type="button" data-close-action="quit">
                   <span class="close-action-icon"><svg><use href="#i-power"></use></svg></span>
-                  <span><strong>完全退出</strong><small>停止播放并结束聆音进程</small></span>
+                  <span><strong>完全退出</strong><small>停止播放并结束曲栈进程</small></span>
                 </button>
               </div>
             </section>
@@ -729,12 +729,12 @@
               <div class="app-info-brand">
                 <div class="app-info-mark"><span></span><span></span><span></span><span></span></div>
                 <div>
-                  <strong>聆音 <em>Lingyin</em></strong>
+                  <strong>曲栈 <em>Quzhan</em></strong>
                   <small>为本地音乐保留一条不会丢失的聆听路径</small>
                 </div>
               </div>
               <dl class="app-info-list">
-                <div><dt>版本</dt><dd id="settingsAppVersion">V 0.3.0</dd></div>
+                <div><dt>版本</dt><dd id="settingsAppVersion">V 0.4.0</dd></div>
                 <div><dt>作者</dt><dd>Iris Li</dd></div>
                 <div><dt>联系</dt><dd>lhxttsbx@gmail.com</dd></div>
                 <div><dt>技术</dt><dd>Electron · Chromium · music-metadata</dd></div>
@@ -752,7 +752,7 @@
       <div class="close-dialog-backdrop" id="closeDialog" hidden>
         <section class="close-dialog-card" role="dialog" aria-modal="true" aria-labelledby="closeDialogTitle">
           <div class="close-dialog-mark"><svg><use href="#i-power"></use></svg></div>
-          <h2 id="closeDialogTitle">要关闭聆音吗？</h2>
+          <h2 id="closeDialogTitle">要关闭曲栈吗？</h2>
           <p>选择一个关闭方式。无论选哪一项，播放队列和已听标记都会自动保存。</p>
           <div class="close-choice-list">
             <label class="close-choice">
@@ -765,7 +765,7 @@
               <input type="radio" name="closeChoice" value="quit" />
               <span class="close-choice-radio"></span>
               <span class="close-choice-icon"><svg><use href="#i-power"></use></svg></span>
-              <span><strong>完全退出程序</strong><small>停止播放并结束聆音进程</small></span>
+              <span><strong>完全退出程序</strong><small>停止播放并结束曲栈进程</small></span>
             </label>
           </div>
           <label class="remember-close-choice">

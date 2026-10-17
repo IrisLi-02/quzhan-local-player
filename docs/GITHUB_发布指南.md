@@ -1,16 +1,16 @@
-# 将聆音上传到 GitHub
+# 将曲栈上传到 GitHub
 
-以下步骤只负责把当前项目准备好；在确认仓库名、许可证和公开范围前，不要直接执行最后的推送。
+本地 Git 仓库已经初始化并完成提交。以下步骤从“准备上传”开始；在确认仓库名、许可证和公开范围前，不要直接执行最后的推送。
 
 ## 1. 先决定仓库名和公开范围
 
 建议使用的仓库名：
 
 ```text
-lingyin-local-player
+quzhan-local-player
 ```
 
-不要在仓库名中单独使用 `lingyin`，因为网络上已经有名称相近的产品和站点，容易让用户误以为存在关联。
+仓库名使用 `quzhan-local-player` 比单独的 `quzhan` 更具体，也方便别人从名称直接看出这是本地播放器项目。
 
 首次测试建议先创建 **Private** 仓库；确认 README、截图和许可证没有问题后，再改为 Public。
 
@@ -23,15 +23,19 @@ gh auth status
 
 也可以直接使用 GitHub 网页创建空仓库，然后在本地推送。
 
-## 3. 进入项目目录并初始化 Git
+## 3. 检查本地仓库
 
 ```powershell
-cd C:\Users\14911\Desktop\聆音
-git init -b main
-git config user.name "Iris Li"
-git config user.email "lhxttsbx@gmail.com"
+cd C:\Users\14911\Desktop\曲栈
+git status --short
+git log --oneline -3
+```
+
+如果之后又改过文件，再提交一次：
+
+```powershell
 git add .
-git commit -m "Initial release: Lingyin 0.3.0"
+git commit -m "Update Quzhan"
 ```
 
 项目中的 `.gitignore` 已排除 `node_modules/`、`dist/`、`release/`、测试数据和临时文件。安装包不应直接提交进 Git，因为单个文件过大，而且 Release 更适合分发二进制。
@@ -41,13 +45,13 @@ git commit -m "Initial release: Lingyin 0.3.0"
 使用 GitHub CLI：
 
 ```powershell
-gh repo create lingyin-local-player --private --source=. --remote=origin --push
+gh repo create quzhan-local-player --private --source=. --remote=origin --push
 ```
 
 或先在网页创建空仓库，再执行：
 
 ```powershell
-git remote add origin https://github.com/你的用户名/lingyin-local-player.git
+git remote add origin https://github.com/你的用户名/quzhan-local-player.git
 git push -u origin main
 ```
 
@@ -56,10 +60,10 @@ git push -u origin main
 把 `release/` 中的安装包和便携版上传到 GitHub Releases，不要提交到普通代码历史：
 
 ```powershell
-gh release create v0.3.0 `
-  "release/Lingyin-Setup-0.3.0-x64.exe" `
-  "release/Lingyin-Portable-0.3.0-x64.exe" `
-  --title "聆音 0.3.0" `
+gh release create v0.4.0 `
+  "release/Quzhan-Setup-0.4.0-x64.exe" `
+  "release/Quzhan-Portable-0.4.0-x64.exe" `
+  --title "曲栈 0.4.0" `
   --notes-file RELEASE_NOTES.md
 ```
 

@@ -44,11 +44,11 @@
 
     if (!payload) {
       setLineText(currentElement, '把每一次聆听留在原处');
-      setLineText(nextElement, '聆音');
+      setLineText(nextElement, '曲栈');
       return;
     }
 
-    artistElement.textContent = [payload.artist, payload.title].filter(Boolean).join(' · ') || '聆音';
+    artistElement.textContent = [payload.artist, payload.title].filter(Boolean).join(' · ') || '曲栈';
     if (payload.accent) {
       document.documentElement.style.setProperty('--accent', payload.accent);
       document.documentElement.style.setProperty('--accent-rgb', payload.accentRgb || '230, 168, 115');
@@ -56,7 +56,7 @@
 
     const lines = Array.isArray(payload.lines) ? payload.lines : [];
     if (!lines.length) {
-      setLineText(currentElement, payload.title || '聆音');
+      setLineText(currentElement, payload.title || '曲栈');
       setLineText(nextElement, payload.artist || '正在播放');
       progressBar.style.width = '0%';
       return;
