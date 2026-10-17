@@ -4,6 +4,17 @@ Set-Location -LiteralPath $PSScriptRoot
 [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
 $OutputEncoding = New-Object System.Text.UTF8Encoding($false)
 
+$internetSettings = Get-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings"
+if ($internetSettings.ProxyEnable -eq 1 -and $internetSettings.ProxyServer) {
+  $systemProxy = $internetSettings.ProxyServer
+  if ($systemProxy -notmatch "^[a-zA-Z]+://") {
+    $systemProxy = "http://$systemProxy"
+  }
+  if (-not $env:HTTPS_PROXY) { $env:HTTPS_PROXY = $systemProxy }
+  if (-not $env:HTTP_PROXY) { $env:HTTP_PROXY = $systemProxy }
+  Write-Host "检测到系统代理：$systemProxy" -ForegroundColor DarkGray
+}
+
 $repoName = "quzhan-local-player"
 $packageText = [System.IO.File]::ReadAllText(
   (Join-Path $PSScriptRoot "package.json"),
