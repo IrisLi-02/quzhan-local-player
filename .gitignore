@@ -22,3 +22,7 @@ __pycache__/
 *.ogg
 *.opus
 *.aiff
+
+# Local publishing helpers and upload guides stay out of the repository.
+一键发布*.ps1
+docs/*发布指南*

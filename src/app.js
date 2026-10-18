@@ -2,6 +2,7 @@
   'use strict';
 
   const api = window.quzhan;
+  const t = window.quzhanI18n.t;
   const audio = document.getElementById('audio');
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -20,6 +21,12 @@
     queueDropOverlay: $('#queueDropOverlay'),
     queueList: $('#queueList'),
     queueEmpty: $('#queueEmpty'),
+    queueNoResults: $('#queueNoResults'),
+    queueSearchInput: $('#queueSearchInput'),
+    clearQueueSearch: $('#clearQueueSearch'),
+    queueFilterOptions: $('#queueFilterOptions'),
+    queueFilterCount: $('#queueFilterCount'),
+    clearQueueFiltersButton: $('#clearQueueFiltersButton'),
     queueCount: $('#queueCount'),
     queueTotalDuration: $('#queueTotalDuration'),
     queueMenuButton: $('#queueMenuButton'),
@@ -87,6 +94,24 @@
     settingsVolumeSlider: $('#settingsVolumeSlider'),
     settingsVolumeValue: $('#settingsVolumeValue'),
     settingsSpectrumToggle: $('#settingsSpectrumToggle'),
+    settingsThemeOptions: $('#settingsThemeOptions'),
+    settingsLanguageOptions: $('#settingsLanguageOptions'),
+    settingsBackgroundPreview: $('#settingsBackgroundPreview'),
+    importBackgroundButton: $('#importBackgroundButton'),
+    clearBackgroundButton: $('#clearBackgroundButton'),
+    settingsBackgroundBlur: $('#settingsBackgroundBlur'),
+    settingsBackgroundBlurValue: $('#settingsBackgroundBlurValue'),
+    settingsBackgroundDim: $('#settingsBackgroundDim'),
+    settingsBackgroundDimValue: $('#settingsBackgroundDimValue'),
+    settingsBackgroundMotion: $('#settingsBackgroundMotion'),
+    shortcutList: $('#shortcutList'),
+    resetShortcutsButton: $('#resetShortcutsButton'),
+    settingsOverlayScale: $('#settingsOverlayScale'),
+    settingsOverlayScaleValue: $('#settingsOverlayScaleValue'),
+    settingsOverlayOpacity: $('#settingsOverlayOpacity'),
+    settingsOverlayOpacityValue: $('#settingsOverlayOpacityValue'),
+    settingsOverlayLocked: $('#settingsOverlayLocked'),
+    settingsOverlayClickThrough: $('#settingsOverlayClickThrough'),
     settingsCloseOptions: $('#settingsCloseOptions'),
     settingsAppVersion: $('#settingsAppVersion'),
     defaultPlayerButton: $('#defaultPlayerButton'),
@@ -113,6 +138,8 @@
     spectrumStrip: $('#spectrumStrip'),
     spectrumCanvas: $('#spectrumCanvas'),
     spectrumStatus: $('#spectrumStatus'),
+    customBackground: $('#customBackground'),
+    customBackgroundImage: $('#customBackgroundImage'),
   };
 
   const MODE_CONFIG = {
@@ -138,6 +165,53 @@
     },
   };
 
+  const THEME_CONFIG = {
+    cover: { label: '跟随封面', accent: null },
+    amber: {
+      label: '琥珀',
+      accent: 'rgb(230, 168, 115)',
+      rgb: '230, 168, 115',
+      soft: 'rgb(243, 199, 159)',
+    },
+    tide: {
+      label: '潮汐',
+      accent: 'rgb(111, 182, 180)',
+      rgb: '111, 182, 180',
+      soft: 'rgb(167, 218, 213)',
+    },
+    moss: {
+      label: '苔原',
+      accent: 'rgb(155, 191, 141)',
+      rgb: '155, 191, 141',
+      soft: 'rgb(196, 220, 181)',
+    },
+    berry: {
+      label: '夜莓',
+      accent: 'rgb(211, 141, 165)',
+      rgb: '211, 141, 165',
+      soft: 'rgb(235, 181, 200)',
+    },
+    indigo: {
+      label: '靛蓝',
+      accent: 'rgb(143, 158, 232)',
+      rgb: '143, 158, 232',
+      soft: 'rgb(187, 197, 245)',
+    },
+  };
+
+  const SHORTCUT_ACTIONS = [
+    { id: 'playPause', label: '暂停 / 继续', fallback: 'Space' },
+    { id: 'next', label: '下一首', fallback: 'KeyD' },
+    { id: 'previous', label: '上一首', fallback: 'KeyA' },
+    { id: 'seekForward', label: '往后 10 秒', fallback: 'ArrowRight' },
+    { id: 'seekBackward', label: '往前 10 秒', fallback: 'ArrowLeft' },
+    { id: 'desktopLyrics', label: '桌面歌词开关', fallback: 'KeyF' },
+  ];
+
+  const DEFAULT_SHORTCUTS = Object.fromEntries(
+    SHORTCUT_ACTIONS.map((action) => [action.id, action.fallback]),
+  );
+
   const defaultState = {
     version: 2,
     queue: [],
@@ -155,6 +229,21 @@
       defaultVolume: 0.78,
       spectrumEnabled: true,
       closeAction: 'ask',
+      language: 'zh-CN',
+      theme: 'cover',
+      shortcuts: { ...DEFAULT_SHORTCUTS },
+      overlay: {
+        scale: 1,
+        opacity: 0.92,
+        locked: false,
+        clickThrough: false,
+      },
+      background: {
+        path: '',
+        blur: 18,
+        dim: 0.58,
+        motion: true,
+      },
     },
   };
 
@@ -188,6 +277,10 @@
   let spectrumAccentRgb = '230, 168, 115';
   let closeDialogOpen = false;
   let associationStatus = null;
+  let queueSearchQuery = '';
+  let queuePlayedFilter = 'all';
+  let shortcutRecording = null;
+  let queueSearchTimer = null;
 
   const textCollator = new Intl.Collator(['zh-Hans-CN-u-co-pinyin', 'zh-CN'], {
     numeric: true,
@@ -204,10 +297,8 @@
   }
 
   function mediaUrl(filePath) {
-    return filePath
-      ? api.mediaBaseUrl
-        ? `${api.mediaBaseUrl}/media?path=${encodeURIComponent(filePath)}`
-        : `quzhan-media://local/?path=${encodeURIComponent(filePath)}`
+    return filePath && api.mediaBaseUrl
+      ? `${api.mediaBaseUrl}/media?path=${encodeURIComponent(filePath)}`
       : '';
   }
 
@@ -232,12 +323,14 @@
   }
 
   function formatDurationLong(seconds) {
-    if (!Number.isFinite(seconds) || seconds <= 0) return '0 分钟';
+    if (!Number.isFinite(seconds) || seconds <= 0) return t('0 分钟');
     const minutes = Math.round(seconds / 60);
-    if (minutes < 60) return `${minutes} 分钟`;
+    if (minutes < 60) return t('{count} 分钟', { count: minutes });
     const hours = Math.floor(minutes / 60);
     const rest = minutes % 60;
-    return rest ? `${hours} 小时 ${rest} 分钟` : `${hours} 小时`;
+    return rest
+      ? t('{hours} 小时 {minutes} 分钟', { hours, minutes: rest })
+      : t('{hours} 小时', { hours });
   }
 
   function snapshotState() {
@@ -270,7 +363,9 @@
 
   function flushState() {
     clearTimeout(saveTimer);
-    api.saveState(snapshotState());
+    const snapshot = snapshotState();
+    api.saveState(snapshot);
+    api.flushState(snapshot).catch(() => {});
   }
 
   function showToast(message, options = {}) {
@@ -286,7 +381,7 @@
     return toast;
   }
 
-  function askConfirm({ title, message, acceptText = '确定', onAccept }) {
+  function askConfirm({ title, message, acceptText = t('确定'), onAccept }) {
     els.confirmTitle.textContent = title;
     els.confirmMessage.textContent = message;
     els.confirmAccept.textContent = acceptText;
@@ -304,11 +399,15 @@
     const selectedCount = selectedIds.size;
     const loopCount = state.selectionLoopIds?.length || 0;
     if (selectedCount) {
-      els.selectionModeHint.textContent = `将循环当前选中的 ${selectedCount} 首歌曲`;
+      els.selectionModeHint.textContent = t('将循环当前选中的 {count} 首歌曲', {
+        count: selectedCount,
+      });
     } else if (loopCount) {
-      els.selectionModeHint.textContent = `当前循环列表中有 ${loopCount} 首歌曲`;
+      els.selectionModeHint.textContent = t('当前循环列表中有 {count} 首歌曲', {
+        count: loopCount,
+      });
     } else {
-      els.selectionModeHint.textContent = '先在队列中选中歌曲';
+      els.selectionModeHint.textContent = t('先在队列中选中歌曲');
     }
   }
 
@@ -327,16 +426,37 @@
     els.loopSelectionButton.disabled = disabled;
     els.removeTracksButton.disabled = disabled;
     els.selectAllButton.title =
-      state.queue.length && count === state.queue.length ? '取消全选' : '全选队列';
+      visibleQueueEntries().length &&
+      count === visibleQueueEntries().length
+        ? t('取消全选')
+        : t('全选队列');
+    els.selectAllButton.setAttribute('aria-label', els.selectAllButton.title);
     updateSelectionModeHint();
+  }
+
+  function visibleQueueEntries() {
+    const query = queueSearchQuery.trim().toLocaleLowerCase();
+    return state.queue
+      .map((item, index) => ({ item, index }))
+      .filter(({ item }) => {
+        if (queuePlayedFilter === 'played' && !item.played) return false;
+        if (queuePlayedFilter === 'unplayed' && item.played) return false;
+        if (!query) return true;
+        return [item.title, item.artist, item.album, item.fileName]
+          .filter(Boolean)
+          .some((value) => String(value).toLocaleLowerCase().includes(query));
+      });
   }
 
   function renderQueue(options = {}) {
     const scrollTop = options.keepScroll ? els.queueList.scrollTop : 0;
     const fragment = document.createDocumentFragment();
-    const totalDuration = state.queue.reduce((sum, item) => sum + (Number(item.duration) || 0), 0);
+    const visibleEntries = visibleQueueEntries();
+    const hasFilter = Boolean(queueSearchQuery.trim()) || queuePlayedFilter !== 'all';
+    const totalDuration = (hasFilter ? visibleEntries.map((entry) => entry.item) : state.queue)
+      .reduce((sum, item) => sum + (Number(item.duration) || 0), 0);
 
-    state.queue.forEach((item, index) => {
+    visibleEntries.forEach(({ item, index }) => {
       const isActive = item.id === state.currentId;
       const isSelected = selectedIds.has(item.id);
       const cover = mediaUrl(item.coverPath);
@@ -355,7 +475,7 @@
       row.setAttribute('role', 'button');
       row.setAttribute(
         'aria-label',
-        `${index + 1}. ${item.title}，${item.artist}${item.missing ? '，文件不可用' : ''}`,
+        `${index + 1}. ${item.title}，${item.artist}${item.missing ? `，${t('文件不可用')}` : ''}`,
       );
       row.setAttribute('aria-current', isActive ? 'true' : 'false');
 
@@ -375,8 +495,8 @@
         <div class="row-copy">
           <div class="row-title">${escapeHtml(item.title)}</div>
           <div class="row-subtitle">
-            ${item.missing ? '<span class="missing-tag">文件不可用</span>' : ''}
-            <span>${escapeHtml(item.artist || '未知艺术家')}</span>
+            ${item.missing ? `<span class="missing-tag">${escapeHtml(t('文件不可用'))}</span>` : ''}
+            <span>${escapeHtml(item.artist || t('未知艺术家'))}</span>
           </div>
         </div>
         <div class="row-duration">${formatTime(item.duration)}</div>
@@ -398,7 +518,20 @@
     els.queueList.replaceChildren(fragment);
     els.queueList.scrollTop = scrollTop;
     els.queueEmpty.hidden = state.queue.length > 0;
-    els.queueCount.textContent = `${state.queue.length} 首`;
+    els.queueNoResults.hidden = !(state.queue.length > 0 && !visibleEntries.length);
+    els.queueList.hidden = visibleEntries.length === 0 && state.queue.length > 0;
+    const countText = hasFilter
+      ? t('显示 {visible} / {total} 首', {
+        visible: visibleEntries.length,
+        total: state.queue.length,
+      })
+      : t('{count} 首', { count: state.queue.length });
+    els.queueCount.textContent = countText;
+    els.queueFilterCount.textContent = hasFilter ? countText : '';
+    els.clearQueueSearch.hidden = !queueSearchQuery;
+    $$('button', els.queueFilterOptions).forEach((button) => {
+      button.setAttribute('aria-pressed', String(button.classList.contains('selected')));
+    });
     els.titlebarQueueCount.textContent = String(state.queue.length);
     els.queueTotalDuration.textContent = formatDurationLong(totalDuration);
     renderSelection();
@@ -424,12 +557,14 @@
       state.queue.length,
     ).padStart(2, '0')}`;
     els.factUnplayed.textContent =
-      state.mode === 'shuffle' ? `${remaining} 首` : `${remaining} 首未听`;
+      state.mode === 'shuffle'
+        ? t('{count} 首', { count: remaining })
+        : t('{count} 首未听', { count: remaining });
     els.factLyrics.textContent = lyricsModel.timed
-      ? '同步歌词'
+      ? t('同步歌词')
       : lyricsModel.lines.length
-        ? '纯文本'
-        : '暂无歌词';
+        ? t('纯文本')
+        : t('暂无歌词');
   }
 
   function setMode(mode, options = {}) {
@@ -441,7 +576,7 @@
           .map((item) => item.id);
       }
       if (!state.selectionLoopIds?.length) {
-        showToast('先选中想循环的歌曲，或点击工具栏里的“循环选中”');
+        showToast(t('先选中想循环的歌曲，或点击工具栏里的“循环选中”'));
         return false;
       }
     }
@@ -451,9 +586,9 @@
     if (options.notify) {
       if (mode === 'shuffle') {
         const unplayed = state.queue.filter((item) => !item.played).length;
-        showToast(`一轮随机已开启，本轮还剩 ${unplayed} 首未听`);
+        showToast(t('一轮随机已开启，本轮还剩 {count} 首未听', { count: unplayed }));
       } else {
-        showToast(`已切换为${MODE_CONFIG[mode].title}`);
+        showToast(t('已切换为{title}', { title: t(MODE_CONFIG[mode].title) }));
       }
     }
     return true;
@@ -463,9 +598,9 @@
     const config = MODE_CONFIG[state.mode] || MODE_CONFIG.sequential;
     const use = els.modeButton.querySelector('use');
     use.setAttribute('href', config.icon);
-    els.modeButton.title = config.title;
+    els.modeButton.title = t(config.title);
     els.modeButton.classList.toggle('active', state.mode !== 'sequential');
-    els.modeBadge.textContent = config.label;
+    els.modeBadge.textContent = t(config.label);
     $$('.mode-option', els.modePopover).forEach((button) => {
       button.classList.toggle('selected', button.dataset.mode === state.mode);
     });
@@ -490,7 +625,7 @@
 
   function sortQueue(mode) {
     if (!state.queue.length) {
-      showToast('播放队列还是空的');
+      showToast(t('播放队列还是空的'));
       return;
     }
     const originalIndex = new Map(state.queue.map((item, index) => [item.id, index]));
@@ -503,7 +638,7 @@
           textCollator.compare(a.title || '', b.title || '') ||
           originalOrder(a, b),
       );
-      showToast('已按歌手排序');
+      showToast(t('已按歌手排序'));
     } else if (mode === 'title') {
       state.queue.sort(
         (a, b) =>
@@ -511,10 +646,10 @@
           textCollator.compare(a.artist || '', b.artist || '') ||
           originalOrder(a, b),
       );
-      showToast('已按歌名首字母排序');
+      showToast(t('已按歌名首字母排序'));
     } else {
       state.queue.sort(originalOrder);
-      showToast('已恢复最初导入顺序');
+      showToast(t('已恢复最初导入顺序'));
     }
     currentSortMode = mode;
     renderSortOptions();
@@ -537,24 +672,197 @@
     });
   }
 
+  function applyTheme(themeId = state.settings?.theme) {
+    const theme = THEME_CONFIG[themeId] || THEME_CONFIG.cover;
+    if (theme.accent) {
+      document.documentElement.style.setProperty('--accent', theme.accent);
+      document.documentElement.style.setProperty('--accent-rgb', theme.rgb);
+      document.documentElement.style.setProperty('--accent-soft', theme.soft);
+      spectrumAccentRgb = theme.rgb;
+      return;
+    }
+    resetAccent();
+    const item = currentItem();
+    if (item?.coverPath) extractAccent(item.coverPath).catch(() => {});
+  }
+
+  function shortcutFromEvent(event) {
+    const code = event.code;
+    if (!code || ['ControlLeft', 'ControlRight', 'ShiftLeft', 'ShiftRight', 'AltLeft',
+      'AltRight', 'MetaLeft', 'MetaRight', 'CapsLock'].includes(code)) {
+      return '';
+    }
+    const parts = [];
+    if (event.ctrlKey) parts.push('Ctrl');
+    if (event.altKey) parts.push('Alt');
+    if (event.shiftKey) parts.push('Shift');
+    if (event.metaKey) parts.push('Meta');
+    parts.push(code);
+    return parts.join('+');
+  }
+
+  function shortcutLabel(combo) {
+    const labels = {
+      Space: 'Space',
+      ArrowLeft: '←',
+      ArrowRight: '→',
+      ArrowUp: '↑',
+      ArrowDown: '↓',
+      Escape: 'Esc',
+      Backspace: 'Backspace',
+      Delete: 'Delete',
+      Enter: 'Enter',
+      Tab: 'Tab',
+      Home: 'Home',
+      End: 'End',
+      PageUp: 'PgUp',
+      PageDown: 'PgDn',
+      Insert: 'Insert',
+      Semicolon: ';',
+      Quote: "'",
+      Comma: ',',
+      Period: '.',
+      Slash: '/',
+      Backslash: '\\',
+      Minus: '-',
+      Equal: '=',
+      BracketLeft: '[',
+      BracketRight: ']',
+      Backquote: '`',
+    };
+    return String(combo || '')
+      .split('+')
+      .map((part) => {
+        if (labels[part]) return labels[part];
+        if (part.startsWith('Key')) return part.slice(3);
+        if (part.startsWith('Digit')) return part.slice(5);
+        if (part.startsWith('Numpad')) return `Num ${part.slice(6)}`;
+        return part;
+      })
+      .join(' + ');
+  }
+
+  function shortcutConflict(combo, exceptId) {
+    return SHORTCUT_ACTIONS.find(
+      (action) => action.id !== exceptId && state.settings.shortcuts?.[action.id] === combo,
+    );
+  }
+
+  function applyShortcutDefaults() {
+    state.settings.shortcuts = { ...DEFAULT_SHORTCUTS };
+    renderShortcutList();
+    scheduleSave(true);
+    showToast(t('快捷键已恢复默认'));
+  }
+
+  function renderShortcutList() {
+    const fragment = document.createDocumentFragment();
+    for (const action of SHORTCUT_ACTIONS) {
+      const row = document.createElement('div');
+      row.className = 'shortcut-row';
+      const label = document.createElement('span');
+      label.textContent = t(action.label);
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'shortcut-key';
+      button.dataset.shortcutAction = action.id;
+      button.textContent = shortcutRecording === action.id
+        ? t('按下新的快捷键…')
+        : shortcutLabel(state.settings.shortcuts?.[action.id] || action.fallback);
+      if (shortcutRecording === action.id) button.classList.add('recording');
+      row.append(label, button);
+      fragment.appendChild(row);
+    }
+    els.shortcutList.replaceChildren(fragment);
+  }
+
+  function renderBackground() {
+    const background = state.settings?.background || defaultState.settings.background;
+    const url = mediaUrl(background.path);
+    els.listeningStage.classList.toggle('has-custom-background', Boolean(url));
+    els.listeningStage.classList.toggle(
+      'background-motion',
+      Boolean(url) && background.motion !== false,
+    );
+    els.listeningStage.style.setProperty('--custom-bg-blur', `${Number(background.blur) || 0}px`);
+    els.listeningStage.style.setProperty('--custom-bg-dim', String(Number(background.dim) || 0));
+    els.customBackgroundImage.style.backgroundImage = url ? `url("${url}")` : 'none';
+    els.customBackground.hidden = !url;
+  }
+
+  function applyOverlaySettings() {
+    api.configureDesktopLyrics(state.settings.overlay).catch(() => {});
+  }
+
   function renderSettings() {
     const settings = state.settings || defaultState.settings;
     const rate = clamp(settings.defaultRate, 0.5, 2);
     const volume = clamp(settings.defaultVolume, 0, 1);
     const volumePercent = Math.round(volume * 100);
+    const background = settings.background || defaultState.settings.background;
+    const blurPercent = (Number(background.blur) / 40) * 100;
+    const dimPercent = (Number(background.dim) / 0.9) * 100;
+    const overlay = settings.overlay || defaultState.settings.overlay;
+    const overlayScalePercent = Math.round(Number(overlay.scale) * 100);
+    const overlayOpacityPercent = Math.round(Number(overlay.opacity) * 100);
+    const backgroundUrl = mediaUrl(background.path);
     $$('button', els.settingsRateOptions).forEach((button) => {
       button.classList.toggle(
         'selected',
         Math.abs(Number(button.dataset.settingsRate) - rate) < 0.001,
       );
     });
+    $$('button', els.settingsThemeOptions).forEach((button) => {
+      button.classList.toggle('selected', button.dataset.theme === settings.theme);
+    });
+    $$('button', els.settingsLanguageOptions).forEach((button) => {
+      button.classList.toggle('selected', button.dataset.language === settings.language);
+    });
     els.settingsVolumeSlider.value = String(volumePercent);
     els.settingsVolumeSlider.style.setProperty('--settings-volume', `${volumePercent}%`);
+    els.settingsVolumeSlider.style.setProperty('--settings-fill', `${volumePercent}%`);
     els.settingsVolumeValue.textContent = `${volumePercent}%`;
     els.settingsSpectrumToggle.checked = settings.spectrumEnabled !== false;
+    els.settingsBackgroundPreview.style.backgroundImage = backgroundUrl
+      ? `url("${backgroundUrl}")`
+      : '';
+    els.settingsBackgroundPreview.classList.toggle('has-image', Boolean(backgroundUrl));
+    els.settingsBackgroundBlur.value = String(Math.round(Number(background.blur) || 0));
+    els.settingsBackgroundBlur.style.setProperty('--settings-fill', `${blurPercent}%`);
+    els.settingsBackgroundBlurValue.textContent = `${Math.round(Number(background.blur) || 0)}px`;
+    els.settingsBackgroundDim.value = String(Math.round((Number(background.dim) || 0) * 100));
+    els.settingsBackgroundDim.style.setProperty('--settings-fill', `${dimPercent}%`);
+    els.settingsBackgroundDimValue.textContent = `${Math.round((Number(background.dim) || 0) * 100)}%`;
+    els.settingsBackgroundMotion.checked = background.motion !== false;
+    els.clearBackgroundButton.disabled = !backgroundUrl;
+    els.settingsOverlayScale.value = String(overlayScalePercent);
+    els.settingsOverlayScale.style.setProperty('--settings-fill', `${((overlayScalePercent - 70) / 90) * 100}%`);
+    els.settingsOverlayScaleValue.textContent = `${overlayScalePercent}%`;
+    els.settingsOverlayOpacity.value = String(overlayOpacityPercent);
+    els.settingsOverlayOpacity.style.setProperty('--settings-fill', `${overlayOpacityPercent}%`);
+    els.settingsOverlayOpacityValue.textContent = `${overlayOpacityPercent}%`;
+    els.settingsOverlayLocked.checked = Boolean(overlay.locked);
+    els.settingsOverlayClickThrough.checked = Boolean(overlay.clickThrough);
+    renderShortcutList();
     $$('.close-action-grid button', els.settingsCloseOptions).forEach((button) => {
       button.classList.toggle('selected', button.dataset.closeAction === settings.closeAction);
     });
+  }
+
+  function applyLanguage(language, options = {}) {
+    if (!['en', 'zh-CN', 'zh-TW'].includes(language)) return;
+    state.settings.language = language;
+    window.quzhanI18n.setLanguage(language);
+    applyTheme(state.settings.theme);
+    renderTrack();
+    renderQueue({ keepScroll: true });
+    renderMode();
+    renderSettings();
+    updatePlayButton();
+    updateProgressUI(audio.currentTime || 0, Number(audio.duration) || 0);
+    if (!els.settingsBackdrop.hidden) refreshAssociationStatus();
+    if (state.desktopLyrics) sendDesktopLyricsPayload();
+    if (options.persist !== false) scheduleSave(true);
   }
 
   function applySpectrumSetting(enabled) {
@@ -573,17 +881,19 @@
     try {
       associationStatus = await api.getAssociationStatus();
       if (!associationStatus?.registered) {
-        els.defaultPlayerStatus.textContent = '尚未在 Windows 中登记，点击右侧按钮完成登记';
+        els.defaultPlayerStatus.textContent = t('尚未在 Windows 中登记，点击右侧按钮完成登记');
       } else if (associationStatus.allDefault) {
-        els.defaultPlayerStatus.textContent = '曲栈已是全部支持格式的默认播放器';
+        els.defaultPlayerStatus.textContent = t('曲栈已是全部支持格式的默认播放器');
       } else if (associationStatus.defaultCount > 0) {
-        els.defaultPlayerStatus.textContent =
-          `已关联 ${associationStatus.defaultCount} / ${associationStatus.total} 种音频格式`;
+        els.defaultPlayerStatus.textContent = t('已关联 {count} / {total} 种音频格式', {
+          count: associationStatus.defaultCount,
+          total: associationStatus.total,
+        });
       } else {
-        els.defaultPlayerStatus.textContent = '已出现在“打开方式”中，尚未设为默认播放器';
+        els.defaultPlayerStatus.textContent = t('已出现在“打开方式”中，尚未设为默认播放器');
       }
     } catch {
-      els.defaultPlayerStatus.textContent = '无法读取 Windows 文件关联状态';
+      els.defaultPlayerStatus.textContent = t('无法读取 Windows 文件关联状态');
     }
   }
 
@@ -593,12 +903,14 @@
       await api.registerAssociations();
       const result = await api.openDefaultAppsSettings();
       showToast(
-        result?.message || '已打开 Windows 默认应用设置，请在系统界面确认曲栈',
+        result?.message || t('已打开 Windows 默认应用设置，请在系统界面确认曲栈'),
         { duration: 4600, error: !result?.ok },
       );
       setTimeout(refreshAssociationStatus, 900);
     } catch (error) {
-      showToast(`无法打开默认应用设置：${error.message || '未知错误'}`, { error: true });
+      showToast(t('无法打开默认应用设置：{message}', {
+        message: error.message || t('未知错误'),
+      }), { error: true });
     } finally {
       els.defaultPlayerButton.disabled = false;
     }
@@ -615,7 +927,7 @@
         tray: '以后点击关闭按钮会最小化到托盘',
         quit: '以后点击关闭按钮会直接退出',
       };
-      showToast(messages[action]);
+      showToast(t(messages[action]));
     }
   }
 
@@ -627,6 +939,7 @@
   }
 
   function closeSettingsPanel() {
+    shortcutRecording = null;
     els.settingsBackdrop.hidden = true;
   }
 
@@ -656,7 +969,7 @@
       setCloseAction(action, { notify: false });
     }
     closeCloseDialog();
-    flushState();
+    api.flushState(snapshotState()).catch(() => {});
     if (action === 'tray') {
       api.hideToTray();
     } else {
@@ -673,7 +986,7 @@
       'href',
       state.muted || volume === 0 ? '#i-volume-off' : '#i-volume',
     );
-    els.volumeButton.title = state.muted ? '取消静音' : '静音';
+    els.volumeButton.title = state.muted ? t('取消静音') : t('静音');
   }
 
   function applyVolume() {
@@ -686,8 +999,8 @@
   function renderQueueOpen() {
     const open = Boolean(state.queueOpen);
     els.appShell.classList.toggle('queue-collapsed', !open);
-    els.queueToggle.title = open ? '收起播放队列' : '展开播放队列';
-    els.titlebarQueueToggle.title = open ? '收起播放队列' : '展开播放队列';
+    els.queueToggle.title = open ? t('收起播放队列') : t('展开播放队列');
+    els.titlebarQueueToggle.title = open ? t('收起播放队列') : t('展开播放队列');
     els.queuePanel.setAttribute('aria-hidden', open ? 'false' : 'true');
   }
 
@@ -698,8 +1011,8 @@
   }
 
   function setEmptyTrackUI() {
-    els.trackTitle.textContent = '还没有正在播放的歌';
-    els.trackArtist.textContent = '从队列里挑一首，或把音乐拖进来';
+    els.trackTitle.textContent = t('还没有正在播放的歌');
+    els.trackArtist.textContent = t('从队列里挑一首，或把音乐拖进来');
     els.trackAlbum.textContent = '';
     els.bylineDot.style.display = 'none';
     els.coverArt.removeAttribute('src');
@@ -708,13 +1021,13 @@
     els.coverArtButton.classList.remove('playing');
     els.dockCover.classList.add('empty');
     els.dockCoverImage.removeAttribute('src');
-    els.dockTrackTitle.textContent = '还没有播放音乐';
-    els.dockTrackArtist.textContent = '播放队列已自动保存';
+    els.dockTrackTitle.textContent = t('还没有播放音乐');
+    els.dockTrackArtist.textContent = t('播放队列已自动保存');
     els.atmosphereImage.style.backgroundImage = 'none';
-    els.titlebarCenter.textContent = '把每一次聆听留在原处';
+    els.titlebarCenter.textContent = t('把每一次聆听留在原处');
     els.playButton.classList.remove('playing');
-    els.playButton.title = '播放';
-    els.playButton.setAttribute('aria-label', '播放');
+    els.playButton.title = t('播放');
+    els.playButton.setAttribute('aria-label', t('播放'));
     els.vinylDisc.classList.remove('spinning');
     updateProgressUI(0, 0);
     resetAccent();
@@ -729,12 +1042,12 @@
       return;
     }
     els.trackTitle.textContent = item.title;
-    els.trackArtist.textContent = item.artist || '未知艺术家';
+    els.trackArtist.textContent = item.artist || t('未知艺术家');
     els.trackAlbum.textContent = item.album || '';
     els.bylineDot.style.display = item.album ? 'block' : 'none';
     els.dockTrackTitle.textContent = item.title;
-    els.dockTrackArtist.textContent = item.artist || '未知艺术家';
-    els.titlebarCenter.textContent = `正在播放 · ${item.title}`;
+    els.dockTrackArtist.textContent = item.artist || t('未知艺术家');
+    els.titlebarCenter.textContent = t('正在播放 · {title}', { title: item.title });
 
     const cover = mediaUrl(item.coverPath);
     if (cover) {
@@ -744,14 +1057,14 @@
       els.atmosphereImage.style.backgroundImage = `url("${cover.replaceAll('"', '\\"')}")`;
       els.dockCover.classList.remove('empty');
       els.dockCoverImage.src = cover;
-      extractAccent(item.coverPath).catch(() => resetAccent());
+      applyTheme(state.settings.theme);
     } else {
       els.coverArt.removeAttribute('src');
       els.coverArt.style.visibility = 'hidden';
       els.coverFallback.style.display = 'flex';
       els.atmosphereImage.style.backgroundImage = 'none';
       els.dockCover.classList.add('empty');
-      resetAccent();
+      applyTheme(state.settings.theme);
     }
     updateFacts();
   }
@@ -779,8 +1092,9 @@
   }
 
   async function extractAccent(filePath) {
-    if (!filePath) return;
+    if (!filePath || state.settings?.theme !== 'cover') return;
     const palette = await api.getCoverPalette(filePath);
+    if (state.settings?.theme !== 'cover') return;
     if (!palette) return;
     const finalSaturation = clamp(Math.max(palette.saturation, 0.38), 0.35, 0.7);
     const finalLightness = clamp(palette.lightness + 0.12, 0.59, 0.72);
@@ -844,9 +1158,9 @@
       els.lyricsEmpty.hidden = false;
       els.lyricsScroll.hidden = true;
       els.emptyQueueButton.hidden = false;
-      emptyHeading.textContent = '让声音慢下来';
-      emptyCopy.textContent = '歌曲内嵌歌词或同名 .lrc 文件会在这里逐行浮现。';
-      els.lyricsSource.textContent = '等待播放';
+      emptyHeading.textContent = t('让声音慢下来');
+      emptyCopy.textContent = t('歌曲内嵌歌词或同名 .lrc 文件会在这里逐行浮现。');
+      els.lyricsSource.textContent = t('等待播放');
       els.lyricsPanel.classList.remove('plain');
       updateFacts();
       return;
@@ -857,10 +1171,9 @@
       els.lyricsEmpty.hidden = false;
       els.lyricsScroll.hidden = true;
       els.emptyQueueButton.hidden = true;
-      emptyHeading.textContent = '这首歌没有歌词';
-      emptyCopy.textContent =
-        '可以在音频文件里嵌入歌词，或在歌曲旁边放一个同名 .lrc 文件，再重新导入这首歌。';
-      els.lyricsSource.textContent = '暂无歌词';
+      emptyHeading.textContent = t('这首歌没有歌词');
+      emptyCopy.textContent = t('可以在音频文件里嵌入歌词，或在歌曲旁边放一个同名 .lrc 文件，再重新导入这首歌。');
+      els.lyricsSource.textContent = t('暂无歌词');
       els.lyricsPanel.classList.remove('plain');
       updateFacts();
       return;
@@ -871,9 +1184,9 @@
     els.lyricsPanel.classList.toggle('plain', !lyricsModel.timed);
     els.lyricsSource.textContent = lyricsModel.timed
       ? item.lyricsSource === 'sidecar'
-        ? 'LRC · 本地文件'
-        : '同步歌词 · 内嵌'
-      : '未同步歌词';
+        ? t('LRC · 本地文件')
+        : t('同步歌词 · 内嵌')
+      : t('未同步歌词');
 
     const fragment = document.createDocumentFragment();
     lyricsModel.lines.forEach((line, index) => {
@@ -883,7 +1196,7 @@
       button.dataset.index = String(index);
       if (line.time != null) {
         button.dataset.time = String(line.time);
-        button.title = `跳转到 ${formatTime(line.time)}`;
+        button.title = t('跳转到 {time}', { time: formatTime(line.time) });
       }
       button.innerHTML = lyricsModel.timed
         ? `<span class="lyric-time">${formatTime(line.time)}</span>${escapeHtml(line.text)}`
@@ -943,15 +1256,23 @@
       els.progressSlider.style.setProperty('--progress', `${ratio * 100}%`);
     }
     els.durationTime.textContent = formatTime(safeDuration);
-    els.progressBuffer.style.width = safeDuration ? '0%' : '0%';
+    let bufferedRatio = 0;
+    if (safeDuration > 0 && audio.buffered?.length) {
+      try {
+        bufferedRatio = clamp(audio.buffered.end(audio.buffered.length - 1) / safeDuration, 0, 1);
+      } catch {
+        bufferedRatio = 0;
+      }
+    }
+    els.progressBuffer.style.width = `${bufferedRatio * 100}%`;
     els.progressSlider.disabled = !currentItem();
   }
 
   function updatePlayButton() {
     const playing = !audio.paused && !audio.ended;
     els.playButton.classList.toggle('playing', playing);
-    els.playButton.title = playing ? '暂停' : '播放';
-    els.playButton.setAttribute('aria-label', playing ? '暂停' : '播放');
+    els.playButton.title = playing ? t('暂停') : t('播放');
+    els.playButton.setAttribute('aria-label', playing ? t('暂停') : t('播放'));
     els.coverArtButton.classList.toggle('playing', playing);
     els.vinylDisc.classList.toggle('spinning', playing);
     const activeRow = els.queueList.querySelector('.queue-row.active');
@@ -975,10 +1296,10 @@
       audioContext = new AudioContextClass();
       const sourceNode = audioContext.createMediaElementSource(audio);
       analyserNode = audioContext.createAnalyser();
-      analyserNode.fftSize = 256;
-      analyserNode.smoothingTimeConstant = 0.82;
-      analyserNode.minDecibels = -88;
-      analyserNode.maxDecibels = -12;
+      analyserNode.fftSize = 512;
+      analyserNode.smoothingTimeConstant = 0.62;
+      analyserNode.minDecibels = -82;
+      analyserNode.maxDecibels = -10;
       sourceNode.connect(analyserNode);
       analyserNode.connect(audioContext.destination);
       frequencyData = new Uint8Array(analyserNode.frequencyBinCount);
@@ -1015,6 +1336,13 @@
 
     const hasFrequencyData = Boolean(analyserNode && frequencyData && !audio.paused);
     if (hasFrequencyData) analyserNode.getByteFrequencyData(frequencyData);
+    let bassLevel = 0;
+    if (hasFrequencyData) {
+      let bassSum = 0;
+      const bassBins = Math.min(12, frequencyData.length);
+      for (let index = 1; index < bassBins; index += 1) bassSum += frequencyData[index];
+      bassLevel = bassSum / Math.max(1, bassBins - 1) / 255;
+    }
 
     context.clearRect(0, 0, spectrumWidth, spectrumHeight);
     const baseline = spectrumHeight - 1;
@@ -1046,15 +1374,16 @@
           }
         }
         const level = samples ? sum / samples / 255 : 0;
-        target = 1.5 + Math.pow(level, 1.5) * maxBarHeight;
+        const energyBoost = 1 + bassLevel * 0.58;
+        target = 1.5 + Math.min(1, Math.pow(level, 1.16) * energyBoost) * maxBarHeight;
       } else {
         target =
           1.7 +
           (Math.sin(timestamp * 0.0016 + index * 0.61) * 0.5 + 0.5) *
-            (audio.paused ? 2.2 : 4.5);
+            (audio.paused ? 2.2 : 5.5);
       }
       const previous = spectrumHeights[index] || 1.5;
-      const easing = target > previous ? 0.36 : 0.105;
+      const easing = target > previous ? 0.62 : 0.16;
       const height = previous + (target - previous) * easing;
       spectrumHeights[index] = height;
       const x = index * cellWidth + (cellWidth - barWidth) / 2;
@@ -1073,7 +1402,7 @@
   }
 
   function startSpectrumAnimation() {
-    if (spectrumFrame || document.hidden) return;
+    if (spectrumFrame || document.hidden || state.settings?.spectrumEnabled === false) return;
     spectrumFrame = requestAnimationFrame(drawSpectrum);
   }
 
@@ -1088,7 +1417,7 @@
     try {
       navigator.mediaSession.metadata = new MediaMetadata({
         title: item.title,
-        artist: item.artist || '未知艺术家',
+        artist: item.artist || t('未知艺术家'),
         album: item.album || '',
       });
     } catch {
@@ -1102,7 +1431,7 @@
           if (!artwork || state.currentId !== itemId) return;
           navigator.mediaSession.metadata = new MediaMetadata({
             title: item.title,
-            artist: item.artist || '未知艺术家',
+            artist: item.artist || t('未知艺术家'),
             album: item.album || '',
             artwork: [{ src: artwork, sizes: '256x256' }],
           });
@@ -1170,7 +1499,9 @@
       .catch((error) => {
         updatePlayButton();
         if (error?.name !== 'AbortError') {
-          showToast('无法开始播放，请检查文件是否仍然存在或格式是否受支持', { error: true });
+          showToast(t('无法开始播放，请检查文件是否仍然存在或格式是否受支持'), {
+            error: true,
+          });
         }
       });
   }
@@ -1226,7 +1557,7 @@
 
     if (state.queue.length > 1) {
       resetPlayedMarkers();
-      showToast('本轮已全部听完，已清空已听标记并开始新的一轮');
+      showToast(t('本轮已全部听完，已清空已听标记并开始新的一轮'));
       return pickRandom(state.queue, currentId);
     }
     return state.queue[0] || null;
@@ -1290,6 +1621,7 @@
     const duration = Number(audio.duration);
     if (!Number.isFinite(duration) || duration <= 0) return;
     audio.currentTime = clamp(audio.currentTime + delta, 0, duration);
+    state.currentTime = audio.currentTime;
     updateProgressUI(audio.currentTime, duration);
     updateLyricsAtTime(audio.currentTime);
     scheduleSave();
@@ -1307,15 +1639,17 @@
 
   async function addTracks() {
     if (importBusy) {
-      showToast('正在导入上一批歌曲，请稍候');
+      showToast(t('正在导入上一批歌曲，请稍候'));
       return;
     }
     try {
       importBusy = true;
-      const result = await api.importFromDialog();
+      const result = await api.importFromDialog(state.queue.map((item) => item.path));
       if (result) await handleImportResult(result);
     } catch (error) {
-      showToast(`导入失败：${error.message || '无法打开文件'}`, { error: true });
+      showToast(t('导入失败：{message}', { message: error.message || t('无法打开文件') }), {
+        error: true,
+      });
     } finally {
       importBusy = false;
     }
@@ -1325,12 +1659,17 @@
     if (!paths?.length || importBusy) return null;
     try {
       importBusy = true;
-      showToast(`正在读取 ${paths.length} 个位置…`, { duration: 2100 });
-      const result = await api.importPaths(paths);
+      showToast(t('正在读取 {count} 个位置…', { count: paths.length }), { duration: 2100 });
+      const result = await api.importPaths(
+        paths,
+        state.queue.map((item) => item.path),
+      );
       await handleImportResult(result);
       return result;
     } catch (error) {
-      showToast(`导入失败：${error.message || '无法读取文件'}`, { error: true });
+      showToast(t('导入失败：{message}', { message: error.message || t('无法读取文件') }), {
+        error: true,
+      });
       return null;
     } finally {
       importBusy = false;
@@ -1358,7 +1697,13 @@
   }
 
   async function handleImportResult(result) {
-    const items = Array.isArray(result?.items) ? result.items : [];
+    const existing = new Set(state.queue.map((item) => pathKey(item.path)));
+    const items = (Array.isArray(result?.items) ? result.items : []).filter((item) => {
+      const key = pathKey(item.path);
+      if (!key || existing.has(key)) return false;
+      existing.add(key);
+      return true;
+    });
     if (items.length) {
       let nextImportOrder =
         state.queue.reduce((max, item) => {
@@ -1379,18 +1724,23 @@
         renderQueue({ keepScroll: true });
       }
       scheduleSave(true);
-      showToast(`已加入 ${items.length} 首歌曲，自动排到队尾`);
+      showToast(t('已加入 {count} 首歌曲，自动排到队尾', { count: items.length }));
+    }
+    if (result?.skipped) {
+      showToast(t('已跳过 {count} 首已在队列中的歌曲', { count: result.skipped }));
     }
     if (result?.errors?.length) {
       const first = result.errors[0];
-      const suffix = result.errors.length > 1 ? `，另有 ${result.errors.length - 1} 个失败` : '';
+      const suffix = result.errors.length > 1
+        ? t('另有 {count} 个失败', { count: result.errors.length - 1 })
+        : '';
       showToast(
-        `${first.message || '部分文件导入失败'}${suffix}`,
+        `${first.message || t('部分文件导入失败')}${suffix}`,
         { error: true, duration: 4800 },
       );
     }
     if (!items.length && !result?.errors?.length) {
-      showToast('没有找到可导入的音频文件');
+      if (!result?.skipped) showToast(t('没有找到可导入的音频文件'));
     }
   }
 
@@ -1400,15 +1750,17 @@
       else selectedIds.add(id);
       selectionAnchorId = id;
     } else if (mode === 'range') {
-      const anchor = selectionAnchorId || state.currentId || state.queue[0]?.id;
-      const from = state.queue.findIndex((item) => item.id === anchor);
-      const to = state.queue.findIndex((item) => item.id === id);
+      const entries = visibleQueueEntries();
+      const anchor = selectionAnchorId || state.currentId || entries[0]?.item.id;
+      let from = entries.findIndex((entry) => entry.item.id === anchor);
+      const to = entries.findIndex((entry) => entry.item.id === id);
+      if (from < 0) from = 0;
       if (from >= 0 && to >= 0) {
         const start = Math.min(from, to);
         const end = Math.max(from, to);
         if (!event.ctrlKey && !event.metaKey) selectedIds.clear();
         for (let index = start; index <= end; index += 1) {
-          selectedIds.add(state.queue[index].id);
+          selectedIds.add(entries[index].item.id);
         }
       }
     }
@@ -1416,13 +1768,14 @@
   }
 
   function selectAll() {
-    if (!state.queue.length) return;
-    if (selectedIds.size === state.queue.length) {
+    const entries = visibleQueueEntries();
+    if (!entries.length) return;
+    if (entries.every((entry) => selectedIds.has(entry.item.id))) {
       selectedIds.clear();
     } else {
-      selectedIds = new Set(state.queue.map((item) => item.id));
+      selectedIds = new Set(entries.map((entry) => entry.item.id));
     }
-    selectionAnchorId = state.queue[0]?.id || null;
+    selectionAnchorId = entries[0]?.item.id || null;
     renderQueue({ keepScroll: true });
   }
 
@@ -1434,12 +1787,12 @@
     markQueueCustomOrder();
     renderQueue({ keepScroll: true });
     scheduleSave(true);
-    showToast(`已移到${edge === 'top' ? '队首' : '队尾'}`);
+    showToast(t('已移到{edge}', { edge: t(edge === 'top' ? '队首' : '队尾') }));
   }
 
   function markSelected(played) {
     if (!selectedIds.size) {
-      showToast('先在队列里选择歌曲');
+      showToast(t('先在队列里选择歌曲'));
       return;
     }
     let changed = 0;
@@ -1452,8 +1805,8 @@
     scheduleSave(true);
     showToast(
       played
-        ? `已为 ${selectedIds.size} 首歌打上已听标记`
-        : `已清除 ${selectedIds.size} 首歌的已听标记`,
+        ? t('已为 {count} 首歌打上已听标记', { count: selectedIds.size })
+        : t('已清除 {count} 首歌的已听标记', { count: selectedIds.size }),
     );
     if (!changed) {
       // The operation is still useful and idempotent; no extra UI noise.
@@ -1462,7 +1815,7 @@
 
   function loopSelected() {
     if (!selectedIds.size) {
-      showToast('先选中想循环的歌曲');
+      showToast(t('先选中想循环的歌曲'));
       return;
     }
     state.selectionLoopIds = state.queue
@@ -1479,7 +1832,7 @@
     updateSelectionModeHint();
     renderQueue({ keepScroll: true });
     scheduleSave(true);
-    showToast(`已设置循环 ${state.selectionLoopIds.length} 首歌曲`);
+    showToast(t('已设置循环 {count} 首歌曲', { count: state.selectionLoopIds.length }));
   }
 
   function removeSelected() {
@@ -1508,12 +1861,14 @@
         state.currentId = null;
         renderQueue();
         setEmptyTrackUI();
+        if (state.desktopLyrics) toggleDesktopLyrics(false);
       }
     } else {
       renderQueue({ keepScroll: true });
     }
     scheduleSave(true);
-    showToast(`已从队列移除 ${removeCount} 首`);
+    showToast(t('已从队列移除 {count} 首', { count: removeCount }));
+    setTimeout(() => api.cleanupCovers().catch(() => {}), 500);
   }
 
   function stopPlayback() {
@@ -1526,9 +1881,11 @@
   function clearQueue() {
     const count = state.queue.length;
     askConfirm({
-      title: '清空播放队列？',
-      message: `队列中的 ${count} 首歌和本轮已听标记都会被清除。音乐文件本身不会被删除。`,
-      acceptText: '清空队列',
+      title: t('清空播放队列？'),
+      message: t('队列中的 {count} 首歌和本轮已听标记都会被清除。音乐文件本身不会被删除。', {
+        count,
+      }),
+      acceptText: t('清空队列'),
       onAccept: () => {
         closeConfirm();
         stopPlayback();
@@ -1544,7 +1901,8 @@
         renderMode();
         if (state.desktopLyrics) toggleDesktopLyrics(false);
         scheduleSave(true);
-        showToast('播放队列已清空');
+        showToast(t('播放队列已清空'));
+        setTimeout(() => api.cleanupCovers().catch(() => {}), 500);
       },
     });
   }
@@ -1556,7 +1914,7 @@
     });
     renderQueue({ keepScroll: true });
     scheduleSave(true);
-    showToast('已清除全部已听标记，新一轮随机从现在开始');
+    showToast(t('已清除全部已听标记，新一轮随机从现在开始'));
   }
 
   function reorderQueue(draggedId, targetId, before) {
@@ -1688,7 +2046,9 @@
 
   function showDesktopLyricsButtonState(active) {
     els.desktopLyricsButton.classList.toggle('active', active);
-    els.desktopLyricsButton.querySelector('span').textContent = active ? '关闭桌面歌词' : '桌面歌词';
+    els.desktopLyricsButton.querySelector('span').textContent = active
+      ? t('关闭桌面歌词')
+      : t('桌面歌词');
     els.desktopLyricsShortcut.classList.toggle('active', active);
   }
 
@@ -1697,8 +2057,10 @@
     if (!item) return null;
     const rootStyles = getComputedStyle(document.documentElement);
     return {
+      id: item.id,
       title: item.title,
       artist: item.artist || '',
+      language: state.settings.language || 'zh-CN',
       timed: Boolean(lyricsModel.timed),
       accent: rootStyles.getPropertyValue('--accent').trim(),
       accentRgb: rootStyles.getPropertyValue('--accent-rgb').trim(),
@@ -1713,7 +2075,7 @@
     const payload = desktopLyricsPayload();
     if (!payload) return;
     api.showDesktopLyrics(payload).catch(() => {
-      showToast('桌面歌词窗口打开失败', { error: true });
+      showToast(t('桌面歌词窗口打开失败'), { error: true });
     });
     showDesktopLyricsButtonState(true);
     startOverlayUpdates();
@@ -1730,14 +2092,14 @@
       return;
     }
     if (!currentItem()) {
-      showToast('先播放一首带歌词的歌，再打开桌面歌词');
+      showToast(t('先播放一首带歌词的歌，再打开桌面歌词'));
       return;
     }
     if (!lyricsModel.timed) {
       showToast(
         lyricsModel.lines.length
-          ? '桌面歌词需要在歌词中加入时间轴，或使用同名 .lrc 文件'
-          : '这首歌还没有歌词，暂时无法显示桌面歌词',
+          ? t('桌面歌词需要在歌词中加入时间轴，或使用同名 .lrc 文件')
+          : t('这首歌还没有歌词，暂时无法显示桌面歌词'),
       );
       return;
     }
@@ -1769,7 +2131,7 @@
   function updateWindowMaximizeIcon(maximized) {
     const use = els.windowMaximize.querySelector('use');
     use.setAttribute('href', maximized ? '#i-restore' : '#i-square');
-    els.windowMaximize.setAttribute('aria-label', maximized ? '还原' : '最大化');
+    els.windowMaximize.setAttribute('aria-label', maximized ? t('还原') : t('最大化'));
   }
 
   function updateAll() {
@@ -1777,6 +2139,7 @@
     renderTrack();
     renderMode();
     renderRate();
+    renderBackground();
     applyVolume();
     renderQueueOpen();
     updatePlayButton();
@@ -1785,6 +2148,15 @@
   }
 
   function bindEvents() {
+    els.coverArt.addEventListener('error', () => {
+      els.coverArt.style.visibility = 'hidden';
+      els.coverFallback.style.display = 'flex';
+      els.atmosphereImage.style.backgroundImage = 'none';
+    });
+    els.dockCoverImage.addEventListener('error', () => {
+      els.dockCoverImage.removeAttribute('src');
+      els.dockCover.classList.add('empty');
+    });
     els.addTracksButton.addEventListener('click', addTracks);
     els.queueEmptyAddButton.addEventListener('click', addTracks);
     els.emptyQueueButton.addEventListener('click', addTracks);
@@ -1827,6 +2199,47 @@
     $$('.sort-option', els.sortPopover).forEach((button) => {
       button.addEventListener('click', () => sortQueue(button.dataset.sort));
     });
+    els.queueSearchInput.addEventListener('input', () => {
+      queueSearchQuery = els.queueSearchInput.value;
+      clearTimeout(queueSearchTimer);
+      queueSearchTimer = setTimeout(() => renderQueue({ keepScroll: true }), 70);
+    });
+    els.queueSearchInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        queueSearchQuery = '';
+        clearTimeout(queueSearchTimer);
+        els.queueSearchInput.value = '';
+        renderQueue({ keepScroll: true });
+      }
+    });
+    els.clearQueueSearch.addEventListener('click', () => {
+      queueSearchQuery = '';
+      clearTimeout(queueSearchTimer);
+      els.queueSearchInput.value = '';
+      els.queueSearchInput.focus();
+      renderQueue({ keepScroll: true });
+    });
+    els.queueFilterOptions.addEventListener('click', (event) => {
+      const button = event.target.closest('button[data-queue-filter]');
+      if (!button) return;
+      queuePlayedFilter = button.dataset.queueFilter;
+      $$('button', els.queueFilterOptions).forEach((entry) => {
+        entry.classList.toggle('selected', entry === button);
+      });
+      renderQueue({ keepScroll: true });
+    });
+    const clearQueueFilters = () => {
+      queueSearchQuery = '';
+      clearTimeout(queueSearchTimer);
+      queuePlayedFilter = 'all';
+      els.queueSearchInput.value = '';
+      $$('button', els.queueFilterOptions).forEach((entry) => {
+        entry.classList.toggle('selected', entry.dataset.queueFilter === 'all');
+      });
+      renderQueue({ keepScroll: true });
+    };
+    els.clearQueueFiltersButton.addEventListener('click', clearQueueFilters);
 
     els.playButton.addEventListener('click', togglePlayPause);
     els.coverArtButton.addEventListener('click', togglePlayPause);
@@ -1893,6 +2306,7 @@
       const ratio = Number(els.progressSlider.value) / 1000;
       if (duration > 0) {
         audio.currentTime = clamp(ratio * duration, 0, duration);
+        state.currentTime = audio.currentTime;
         updateLyricsAtTime(audio.currentTime);
       }
       isScrubbing = false;
@@ -1931,12 +2345,103 @@
       applySpectrumSetting(state.settings.spectrumEnabled);
       scheduleSave(true);
     });
+    $$('button', els.settingsThemeOptions).forEach((button) => {
+      button.addEventListener('click', () => {
+        state.settings.theme = button.dataset.theme;
+        applyTheme(state.settings.theme);
+        renderSettings();
+        if (state.desktopLyrics) sendDesktopLyricsPayload();
+        scheduleSave(true);
+      });
+    });
+    $$('button', els.settingsLanguageOptions).forEach((button) => {
+      button.addEventListener('click', () => applyLanguage(button.dataset.language));
+    });
+    els.importBackgroundButton.addEventListener('click', async () => {
+      els.importBackgroundButton.disabled = true;
+      try {
+        const result = await api.importBackground();
+        if (result?.ok) {
+          state.settings.background.path = result.path;
+          renderBackground();
+          renderSettings();
+          scheduleSave(true);
+          showToast(t('背景已导入'));
+        } else if (result?.code === 'UNSUPPORTED_IMAGE') {
+          showToast(t('图片格式不受支持'), { error: true });
+        }
+      } catch (error) {
+        showToast(t('导入失败：{message}', {
+          message: error.message || t('未知错误'),
+        }), { error: true });
+      } finally {
+        els.importBackgroundButton.disabled = false;
+      }
+    });
+    els.clearBackgroundButton.addEventListener('click', async () => {
+      state.settings.background.path = '';
+      await api.clearBackground().catch(() => {});
+      renderBackground();
+      renderSettings();
+      scheduleSave(true);
+      showToast(t('已移除背景'));
+    });
+    els.settingsBackgroundBlur.addEventListener('input', () => {
+      state.settings.background.blur = Number(els.settingsBackgroundBlur.value);
+      els.settingsBackgroundBlurValue.textContent = `${state.settings.background.blur}px`;
+      renderBackground();
+    });
+    els.settingsBackgroundBlur.addEventListener('change', () => scheduleSave(true));
+    els.settingsBackgroundDim.addEventListener('input', () => {
+      state.settings.background.dim = Number(els.settingsBackgroundDim.value) / 100;
+      els.settingsBackgroundDimValue.textContent = `${els.settingsBackgroundDim.value}%`;
+      renderBackground();
+    });
+    els.settingsBackgroundDim.addEventListener('change', () => scheduleSave(true));
+    els.settingsBackgroundMotion.addEventListener('change', () => {
+      state.settings.background.motion = els.settingsBackgroundMotion.checked;
+      renderBackground();
+      scheduleSave(true);
+    });
+    els.shortcutList.addEventListener('click', (event) => {
+      const button = event.target.closest('button[data-shortcut-action]');
+      if (!button) return;
+      shortcutRecording = button.dataset.shortcutAction;
+      renderShortcutList();
+      const next = els.shortcutList.querySelector(
+        `button[data-shortcut-action="${shortcutRecording}"]`,
+      );
+      next?.focus();
+    });
+    els.resetShortcutsButton.addEventListener('click', applyShortcutDefaults);
+    els.settingsOverlayScale.addEventListener('input', () => {
+      state.settings.overlay.scale = Number(els.settingsOverlayScale.value) / 100;
+      els.settingsOverlayScaleValue.textContent = `${els.settingsOverlayScale.value}%`;
+      applyOverlaySettings();
+    });
+    els.settingsOverlayScale.addEventListener('change', () => scheduleSave(true));
+    els.settingsOverlayOpacity.addEventListener('input', () => {
+      state.settings.overlay.opacity = Number(els.settingsOverlayOpacity.value) / 100;
+      els.settingsOverlayOpacityValue.textContent = `${els.settingsOverlayOpacity.value}%`;
+      applyOverlaySettings();
+    });
+    els.settingsOverlayOpacity.addEventListener('change', () => scheduleSave(true));
+    els.settingsOverlayLocked.addEventListener('change', () => {
+      state.settings.overlay.locked = els.settingsOverlayLocked.checked;
+      applyOverlaySettings();
+      scheduleSave(true);
+    });
+    els.settingsOverlayClickThrough.addEventListener('change', () => {
+      state.settings.overlay.clickThrough = els.settingsOverlayClickThrough.checked;
+      applyOverlaySettings();
+      scheduleSave(true);
+    });
     $$('.close-action-grid button', els.settingsCloseOptions).forEach((button) => {
       button.addEventListener('click', () => setCloseAction(button.dataset.closeAction));
     });
     els.defaultPlayerButton.addEventListener('click', openWindowsDefaultApps);
     els.openUserDataButton.addEventListener('click', () => {
-      api.openUserData().catch(() => showToast('无法打开应用数据目录', { error: true }));
+      api.openUserData().catch(() => showToast(t('无法打开应用数据目录'), { error: true }));
     });
     els.closeDialogCancel.addEventListener('click', closeCloseDialog);
     els.closeDialogConfirm.addEventListener('click', confirmCloseAction);
@@ -1946,7 +2451,7 @@
     els.dockMoreButton.addEventListener('click', () => {
       const item = currentItem();
       if (item) api.revealFile(item.path);
-      else showToast('当前还没有播放歌曲');
+      else showToast(t('当前还没有播放歌曲'));
     });
 
     els.windowMinimize.addEventListener('click', () => api.minimize());
@@ -2081,6 +2586,10 @@
     });
 
     document.addEventListener('click', (event) => {
+      if (shortcutRecording && !event.target.closest('.shortcut-key')) {
+        shortcutRecording = null;
+        renderShortcutList();
+      }
       if (
         !els.modePopover.contains(event.target) &&
         !els.modeButton.contains(event.target) &&
@@ -2098,6 +2607,31 @@
     document.addEventListener('keydown', (event) => {
       const tag = event.target?.tagName;
       const typing = tag === 'INPUT' || tag === 'TEXTAREA' || event.target?.isContentEditable;
+      if (shortcutRecording) {
+        event.preventDefault();
+        event.stopPropagation();
+        if (event.key === 'Escape') {
+          shortcutRecording = null;
+          renderShortcutList();
+          return;
+        }
+        const combo = shortcutFromEvent(event);
+        if (!combo) return;
+        const actionId = shortcutRecording;
+        const conflict = shortcutConflict(combo, actionId);
+        if (conflict) {
+          showToast(t('这个快捷键已用于“{action}”', { action: t(conflict.label) }), {
+            error: true,
+          });
+          return;
+        }
+        state.settings.shortcuts[actionId] = combo;
+        shortcutRecording = null;
+        renderShortcutList();
+        scheduleSave(true);
+        showToast(t('快捷键已更新'));
+        return;
+      }
       if (event.key === 'Escape') {
         if (!els.closeDialog.hidden) {
           closeCloseDialog();
@@ -2112,24 +2646,50 @@
         return;
       }
       if (!els.closeDialog.hidden || !els.settingsBackdrop.hidden) return;
-      if (typing) return;
-      if (event.code === 'Space' && !event.target.closest('.queue-row')) {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f') {
         event.preventDefault();
-        togglePlayPause();
+        els.queueSearchInput.focus();
+        return;
+      }
+      if (typing) return;
+      const combo = shortcutFromEvent(event);
+      const shortcuts = state.settings.shortcuts || DEFAULT_SHORTCUTS;
+      const isQueueRow = Boolean(event.target?.closest?.('.queue-row'));
+      if (combo === shortcuts.playPause && !isQueueRow) {
+        event.preventDefault();
+        if (!event.repeat) togglePlayPause();
+        return;
+      }
+      if (combo === shortcuts.next) {
+        event.preventDefault();
+        if (!event.repeat) nextTrack(true);
+        return;
+      }
+      if (combo === shortcuts.previous) {
+        event.preventDefault();
+        if (!event.repeat) previousTrack();
+        return;
+      }
+      if (combo === shortcuts.seekForward) {
+        event.preventDefault();
+        seekBy(10);
+        return;
+      }
+      if (combo === shortcuts.seekBackward) {
+        event.preventDefault();
+        seekBy(-10);
+        return;
+      }
+      if (combo === shortcuts.desktopLyrics) {
+        event.preventDefault();
+        if (!event.repeat) toggleDesktopLyrics();
+        return;
       }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') {
         if (state.queue.length && state.queueOpen) {
           event.preventDefault();
           selectAll();
         }
-      }
-      if (event.key === 'ArrowRight' && event.altKey) {
-        event.preventDefault();
-        seekBy(10);
-      }
-      if (event.key === 'ArrowLeft' && event.altKey) {
-        event.preventDefault();
-        seekBy(-10);
       }
       if (event.key === 'MediaPlayPause') {
         event.preventDefault();
@@ -2183,6 +2743,7 @@
 
   function bindAudioEvents() {
     audio.addEventListener('timeupdate', () => {
+      state.currentTime = audio.currentTime || 0;
       const duration = Number(audio.duration) || currentItem()?.duration || 0;
       if (!isScrubbing) updateProgressUI(audio.currentTime || 0, duration);
       updateLyricsAtTime(audio.currentTime || 0);
@@ -2197,6 +2758,11 @@
     audio.addEventListener('loadedmetadata', () => {
       const item = currentItem();
       const duration = Number(audio.duration);
+      if (item?.missing) {
+        item.missing = false;
+        renderQueue({ keepScroll: true });
+        scheduleSave(true);
+      }
       if (item && Number.isFinite(duration) && Math.abs(duration - item.duration) > 0.8) {
         item.duration = duration;
         renderQueue({ keepScroll: true });
@@ -2209,6 +2775,10 @@
       updateLyricsAtTime(audio.currentTime || 0, { force: true });
       updateMediaSessionPosition();
     });
+    audio.addEventListener('progress', () => {
+      const duration = Number(audio.duration) || currentItem()?.duration || 0;
+      updateProgressUI(audio.currentTime || 0, duration);
+    });
     audio.addEventListener('durationchange', () => {
       updateProgressUI(audio.currentTime || 0, Number(audio.duration) || 0);
     });
@@ -2219,6 +2789,11 @@
     });
     audio.addEventListener('playing', () => {
       updatePlayButton();
+      const item = currentItem();
+      if (item?.missing) {
+        item.missing = false;
+        renderQueue({ keepScroll: true });
+      }
       if (state.currentId) markPlayed(state.currentId);
       updateMediaSessionPosition();
     });
@@ -2233,7 +2808,10 @@
       audioErrorNotifiedFor = item.id;
       item.missing = true;
       renderQueue({ keepScroll: true });
-      showToast(`无法播放“${item.title}”，文件可能已移动或格式暂不支持`, {
+      scheduleSave(true);
+      showToast(t('无法播放“{title}”，文件可能已移动或格式暂不支持', {
+        title: item.title,
+      }), {
         error: true,
         duration: 5200,
       });
@@ -2279,11 +2857,25 @@
         settings: {
           ...defaultState.settings,
           ...(saved?.settings && typeof saved.settings === 'object' ? saved.settings : {}),
+          shortcuts: {
+            ...defaultState.settings.shortcuts,
+            ...(saved?.settings?.shortcuts || {}),
+          },
+          overlay: {
+            ...defaultState.settings.overlay,
+            ...(saved?.settings?.overlay || {}),
+          },
+          background: {
+            ...defaultState.settings.background,
+            ...(saved?.settings?.background || {}),
+          },
         },
       };
     } catch (error) {
       state = { ...defaultState };
-      showToast(`读取播放列表失败：${error.message || '未知错误'}`, { error: true });
+      showToast(t('读取播放列表失败：{message}', {
+        message: error.message || t('未知错误'),
+      }), { error: true });
     }
 
     state.queue.forEach((item, index) => {
@@ -2300,6 +2892,14 @@
       .catch(() => {});
     state.settings.defaultRate = clamp(state.settings.defaultRate, 0.5, 2);
     state.settings.defaultVolume = clamp(state.settings.defaultVolume, 0, 1);
+    if (!['en', 'zh-CN', 'zh-TW'].includes(state.settings.language)) {
+      state.settings.language = 'zh-CN';
+    }
+    if (!THEME_CONFIG[state.settings.theme]) state.settings.theme = 'cover';
+    state.settings.overlay.scale = clamp(state.settings.overlay.scale, 0.7, 1.6);
+    state.settings.overlay.opacity = clamp(state.settings.overlay.opacity, 0.25, 1);
+    state.settings.background.blur = clamp(state.settings.background.blur, 0, 40);
+    state.settings.background.dim = clamp(state.settings.background.dim, 0, 0.9);
     state.rate = state.settings.defaultRate;
     state.volume = state.settings.defaultVolume;
     state.muted = false;
@@ -2308,9 +2908,13 @@
     audio.playbackRate = state.rate;
     audio.defaultPlaybackRate = audio.playbackRate;
     lastSavedVolume = state.volume || 0.78;
+    window.quzhanI18n.setLanguage(state.settings.language);
+    applyTheme(state.settings.theme);
     renderRate();
     renderSettings();
     applySpectrumSetting(state.settings.spectrumEnabled !== false);
+    renderBackground();
+    applyOverlaySettings();
     applyVolume();
     renderQueueOpen();
     renderMode();

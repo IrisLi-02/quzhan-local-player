@@ -13,7 +13,7 @@ Quzhan does not upload music, connect to online catalogs, or require an account.
 
 ## Core Features
 
-- Plays local audio formats supported by Chromium, including MP3, FLAC, M4A/AAC, WAV, OGG/OPUS, and AIFF.
+- Plays local audio formats supported by Chromium, including MP3, FLAC, M4A/AAC, WAV, OGG/OPUS, and WEBM.
 - Restores the play queue, current track, playback position, playback mode, default volume, and default speed after restarting.
 - Imports files from a file picker or by dragging files and whole folders into the queue. New tracks are appended in import order.
 - Collapsible queue panel with single-click playback, long-press drag reordering, Ctrl multi-select, Shift range selection, move-to-top, move-to-bottom, and batch removal.
@@ -23,6 +23,12 @@ Quzhan does not upload music, connect to online catalogs, or require an account.
 - Independent always-on-top desktop lyrics window that remains active when the main window is minimized or hidden to the tray.
 - Real-time audio spectrum above the player controls, which can be disabled in Settings.
 - Settings for default playback speed, default volume, spectrum visibility, close-button behavior, Windows integration, and application information.
+- Six colorways including Follow cover art and five fixed palettes for borders and desktop lyrics.
+- English, Simplified Chinese, and Traditional Chinese interfaces. The installer defaults to English and offers a language choice at the start.
+- Remappable shortcuts for play/pause, next, previous, ±10 seconds, and desktop lyrics.
+- Queue search across title, artist, album, and filename, with played/unplayed filters.
+- Desktop lyrics size and opacity controls, position locking, and click-through mode.
+- Custom local background images for the listening stage, with blur, dimming, and slow ambient motion; GIF and animated WebP keep their animation.
 - Registers supported audio formats with Windows “Open with” after the app runs. The Windows Default Apps page can be opened directly from Settings.
 - The first close action asks whether to minimize to the tray or fully quit, with an option to remember the choice.
 
@@ -57,11 +63,11 @@ Audio is streamed to Chromium from a temporary loopback-only local server. This 
 
 Check the repository's **Releases** page for:
 
-- `Quzhan-Setup-0.4.0-x64.exe` — installer
-- `Quzhan-Portable-0.4.0-x64.exe` — portable build
+- `Quzhan-Setup-0.5.1-x64.exe` — installer
+- `Quzhan-Portable-0.5.1-x64.exe` — portable build
 - `SHA256SUMS.txt` — release checksums
 
-The current UI is primarily in Simplified Chinese.
+The UI supports English, Simplified Chinese, and Traditional Chinese.
 
 ## Build From Source
 
@@ -88,7 +94,7 @@ Build the portable and installer executables:
 npm run dist
 ```
 
-Outputs are written to `dist/`. For GitHub, upload installers as Release assets rather than committing them to the repository.
+Outputs are written to `dist/` and are not committed to the source repository.
 
 ## Windows Default Player Behavior
 
@@ -110,7 +116,7 @@ The application does not collect telemetry, send playback history, include adver
 
 ## Known Limitations
 
-- WMA and APE are not currently supported because Chromium cannot decode them directly.
+- WMA, APE, and AIFF are not currently supported because Chromium cannot decode them directly.
 - Windows requires the user to confirm default-app changes in system UI.
 - Line-by-line desktop lyrics require `.lrc` or embedded timed lyrics. Plain lyrics are displayed without synchronization.
 - The current build is not code-signed, so Windows SmartScreen may show a warning.
@@ -123,7 +129,7 @@ This is a personal project and the first complete desktop application I have dev
 
 - Author: Iris Li
 - Contact: lhxttsbx@gmail.com
-- Version: `0.4.0`
+- Version: `0.5.1`
 - Platform: Windows 10/11 x64
 
 ### AI Assistance Disclosure

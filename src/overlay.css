@@ -79,6 +79,10 @@ body {
   height: 43px;
 }
 
+body.locked .overlay-shell {
+  -webkit-app-region: no-drag;
+}
+
 .overlay-status {
   position: absolute;
   top: 17px;

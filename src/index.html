@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: quzhan-media: http://127.0.0.1:*; media-src 'self' blob: quzhan-media: http://127.0.0.1:*; font-src 'self' data:; connect-src 'self' http://127.0.0.1:*;"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: http://127.0.0.1:*; media-src 'self' blob: http://127.0.0.1:*; font-src 'self' data:; connect-src 'self' http://127.0.0.1:*;"
     />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>曲栈</title>
@@ -175,7 +175,7 @@
             <span></span><span></span><span></span><span></span>
           </div>
           <div class="brand-name">曲栈</div>
-          <div class="app-version" id="appVersion">V 0.4.0</div>
+          <div class="app-version" id="appVersion">V 0.5.1</div>
           <div class="brand-edition">LOCAL / 01</div>
         </div>
         <div class="titlebar-center" id="titlebarCenter">把每一次聆听留在原处</div>
@@ -206,6 +206,10 @@
 
       <main class="workspace" id="workspace">
         <section class="listening-stage" id="listeningStage">
+          <div class="custom-background" id="customBackground" aria-hidden="true">
+            <div class="custom-background-image" id="customBackgroundImage"></div>
+            <div class="custom-background-scrim"></div>
+          </div>
           <div class="stage-atmosphere" aria-hidden="true">
             <div class="atmosphere-image" id="atmosphereImage"></div>
             <div class="atmosphere-veil"></div>
@@ -381,6 +385,32 @@
             <span class="selection-tip">Ctrl 点击多选 · Shift 选择区间</span>
           </div>
 
+          <div class="queue-search-block">
+            <label class="queue-search-box" for="queueSearchInput">
+              <svg><use href="#i-search"></use></svg>
+              <input
+                id="queueSearchInput"
+                type="search"
+                autocomplete="off"
+                spellcheck="false"
+                placeholder="搜索歌曲、歌手或专辑"
+                aria-label="搜索播放列表"
+              />
+              <button class="queue-search-clear" id="clearQueueSearch" type="button" title="清除搜索" aria-label="清除搜索" hidden>
+                <svg><use href="#i-close"></use></svg>
+              </button>
+            </label>
+            <div class="queue-filter-row">
+              <span class="queue-filter-label">筛选</span>
+              <div class="queue-filter-options" id="queueFilterOptions" role="group" aria-label="筛选播放列表">
+                <button type="button" data-queue-filter="all" class="selected">全部</button>
+                <button type="button" data-queue-filter="played">已标记</button>
+                <button type="button" data-queue-filter="unplayed">未标记</button>
+              </div>
+              <span class="queue-filter-count" id="queueFilterCount"></span>
+            </div>
+          </div>
+
           <div class="queue-column-head">
             <span>#</span>
             <span>曲目</span>
@@ -399,6 +429,19 @@
             <button class="outline-button" id="queueEmptyAddButton" type="button">
               <svg><use href="#i-add"></use></svg>
               选择本地音乐
+            </button>
+          </div>
+
+          <div class="queue-empty queue-no-results" id="queueNoResults" hidden>
+            <div class="queue-empty-art">
+              <span></span><span></span><span></span>
+              <svg><use href="#i-search"></use></svg>
+            </div>
+            <h3>没有匹配的歌曲</h3>
+            <p>尝试更换关键词，或关闭筛选。</p>
+            <button class="outline-button" id="clearQueueFiltersButton" type="button">
+              <svg><use href="#i-close"></use></svg>
+              清除搜索和筛选
             </button>
           </div>
 
@@ -639,7 +682,170 @@
           <div class="settings-scroll">
             <section class="settings-section">
               <div class="settings-section-heading">
-                <span>播放</span>
+                <span>外观</span>
+                <small>APPEARANCE</small>
+              </div>
+
+              <div class="setting-row setting-row-stack">
+                <div class="setting-copy">
+                  <strong>界面主题</strong>
+                  <small>边框、强调色和桌面歌词会跟随所选配色</small>
+                </div>
+                <div class="theme-grid" id="settingsThemeOptions">
+                  <button type="button" data-theme="cover">
+                    <span class="theme-swatch theme-swatch-cover"></span>
+                    <span>跟随封面</span>
+                  </button>
+                  <button type="button" data-theme="amber">
+                    <span class="theme-swatch theme-swatch-amber"></span>
+                    <span>琥珀</span>
+                  </button>
+                  <button type="button" data-theme="tide">
+                    <span class="theme-swatch theme-swatch-tide"></span>
+                    <span>潮汐</span>
+                  </button>
+                  <button type="button" data-theme="moss">
+                    <span class="theme-swatch theme-swatch-moss"></span>
+                    <span>苔原</span>
+                  </button>
+                  <button type="button" data-theme="berry">
+                    <span class="theme-swatch theme-swatch-berry"></span>
+                    <span>夜莓</span>
+                  </button>
+                  <button type="button" data-theme="indigo">
+                    <span class="theme-swatch theme-swatch-indigo"></span>
+                    <span>靛蓝</span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="setting-row">
+                <div class="setting-copy">
+                  <strong>界面语言</strong>
+                  <small>切换后立即应用，并会记住你的选择</small>
+                </div>
+                <div class="settings-segmented settings-language" id="settingsLanguageOptions">
+                  <button type="button" data-language="en">English</button>
+                  <button type="button" data-language="zh-CN">简体中文</button>
+                  <button type="button" data-language="zh-TW">繁體中文</button>
+                </div>
+              </div>
+            </section>
+
+            <section class="settings-section">
+              <div class="settings-section-heading">
+                <span>自定义背景</span>
+                <small>BACKGROUND</small>
+              </div>
+              <div class="background-editor">
+                <div class="background-preview" id="settingsBackgroundPreview">
+                  <span>背景预览</span>
+                </div>
+                <div class="background-actions">
+                  <button class="settings-action-button" id="importBackgroundButton" type="button">
+                    <svg><use href="#i-folder"></use></svg>
+                    导入背景图片
+                  </button>
+                  <button class="quiet-button background-remove" id="clearBackgroundButton" type="button">
+                    <svg><use href="#i-trash"></use></svg>
+                    移除背景
+                  </button>
+                </div>
+              </div>
+              <div class="setting-row">
+                <div class="setting-copy">
+                  <strong>背景模糊</strong>
+                  <small>让背景退到文字和封面之后</small>
+                </div>
+                <div class="settings-slider">
+                  <input type="range" id="settingsBackgroundBlur" min="0" max="40" value="18" step="1" aria-label="背景模糊" />
+                  <span id="settingsBackgroundBlurValue">18px</span>
+                </div>
+              </div>
+              <div class="setting-row">
+                <div class="setting-copy">
+                  <strong>背景调暗</strong>
+                  <small>提高歌词和歌曲信息的可读性</small>
+                </div>
+                <div class="settings-slider">
+                  <input type="range" id="settingsBackgroundDim" min="0" max="90" value="58" step="1" aria-label="背景调暗" />
+                  <span id="settingsBackgroundDimValue">58%</span>
+                </div>
+              </div>
+              <div class="setting-row">
+                <div class="setting-copy">
+                  <strong>动态效果</strong>
+                  <small>静态图片会缓慢呼吸移动；GIF 和动态 WebP 会保留动画</small>
+                </div>
+                <label class="switch-control">
+                  <input type="checkbox" id="settingsBackgroundMotion" checked />
+                  <span class="switch-track"><span></span></span>
+                </label>
+              </div>
+            </section>
+
+            <section class="settings-section">
+              <div class="settings-section-heading">
+                <span>快捷键</span>
+                <small>SHORTCUTS</small>
+              </div>
+              <div class="shortcut-list" id="shortcutList"></div>
+              <div class="shortcut-footer">
+                <span>点击右侧按键，然后按下新的组合键</span>
+                <button class="quiet-button" id="resetShortcutsButton" type="button">恢复默认快捷键</button>
+              </div>
+            </section>
+
+            <section class="settings-section">
+              <div class="settings-section-heading">
+                <span>桌面歌词设置</span>
+                <small>DESKTOP LYRICS</small>
+              </div>
+              <div class="setting-row">
+                <div class="setting-copy">
+                  <strong>悬浮窗大小</strong>
+                  <small>调整桌面歌词窗的整体尺寸</small>
+                </div>
+                <div class="settings-slider">
+                  <input type="range" id="settingsOverlayScale" min="70" max="160" value="100" step="5" aria-label="悬浮窗大小" />
+                  <span id="settingsOverlayScaleValue">100%</span>
+                </div>
+              </div>
+              <div class="setting-row">
+                <div class="setting-copy">
+                  <strong>整体不透明度</strong>
+                  <small>同时影响背景、文字和进度线</small>
+                </div>
+                <div class="settings-slider">
+                  <input type="range" id="settingsOverlayOpacity" min="25" max="100" value="92" step="1" aria-label="整体不透明度" />
+                  <span id="settingsOverlayOpacityValue">92%</span>
+                </div>
+              </div>
+              <div class="setting-row">
+                <div class="setting-copy">
+                  <strong>锁定位置</strong>
+                  <small>锁定后不能拖动悬浮窗</small>
+                </div>
+                <label class="switch-control">
+                  <input type="checkbox" id="settingsOverlayLocked" />
+                  <span class="switch-track"><span></span></span>
+                </label>
+              </div>
+              <div class="setting-row">
+                <div class="setting-copy">
+                  <strong>鼠标穿透</strong>
+                  <small>开启后鼠标点击会穿过悬浮窗</small>
+                </div>
+                <label class="switch-control">
+                  <input type="checkbox" id="settingsOverlayClickThrough" />
+                  <span class="switch-track"><span></span></span>
+                </label>
+              </div>
+            </section>
+
+            <section class="settings-section">
+              <div class="settings-section-heading">
+                <span>播放设置</span>
                 <small>PLAYBACK</small>
               </div>
 
@@ -734,7 +940,7 @@
                 </div>
               </div>
               <dl class="app-info-list">
-                <div><dt>版本</dt><dd id="settingsAppVersion">V 0.4.0</dd></div>
+                <div><dt>版本</dt><dd id="settingsAppVersion">V 0.5.1</dd></div>
                 <div><dt>作者</dt><dd>Iris Li</dd></div>
                 <div><dt>联系</dt><dd>lhxttsbx@gmail.com</dd></div>
                 <div><dt>技术</dt><dd>Electron · Chromium · music-metadata</dd></div>
@@ -784,6 +990,7 @@
     </div>
 
     <audio id="audio" crossorigin="anonymous"></audio>
+    <script src="./i18n.js"></script>
     <script src="./app.js"></script>
   </body>
 </html>

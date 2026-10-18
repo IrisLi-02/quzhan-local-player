@@ -10,6 +10,13 @@
   let payload = null;
   let playback = { time: 0, playing: false };
   let activeIndex = -2;
+  let activeTrackId = '';
+  let language = 'zh-CN';
+  const idleText = {
+    en: { line: 'Keep every listen where it belongs', brand: 'Quzhan' },
+    'zh-CN': { line: '把每一次聆听留在原处', brand: '曲栈' },
+    'zh-TW': { line: '把每一次聆聽留在原處', brand: '曲棧' },
+  };
 
   function findTimedIndex(lines, time) {
     let low = 0;
@@ -38,13 +45,22 @@
   }
 
   function render(nextPayload, nextPlayback) {
-    payload = nextPayload || payload;
+    if (nextPayload) {
+      const nextTrackId = String(nextPayload.id || nextPayload.title || '');
+      if (nextPayload.language) language = nextPayload.language;
+      if (nextTrackId && nextTrackId !== activeTrackId) {
+        activeTrackId = nextTrackId;
+        activeIndex = -2;
+      }
+      payload = nextPayload;
+    }
     playback = nextPlayback || playback;
     document.body.classList.toggle('paused', !playback.playing);
 
     if (!payload) {
-      setLineText(currentElement, '把每一次聆听留在原处');
-      setLineText(nextElement, '曲栈');
+      const copy = idleText[language] || idleText['zh-CN'];
+      setLineText(currentElement, copy.line);
+      setLineText(nextElement, copy.brand);
       return;
     }
 
@@ -85,6 +101,11 @@
   window.overlay.onState((value) => {
     if (!value) return;
     render(value.payload, value.playback);
+  });
+
+  window.overlay.onSettings((value) => {
+    if (!value) return;
+    document.body.classList.toggle('locked', Boolean(value.locked));
   });
 
   closeButton.addEventListener('click', (event) => {

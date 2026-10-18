@@ -5,7 +5,6 @@ const {
   ipcMain,
   Menu,
   nativeImage,
-  protocol,
   shell,
   screen,
   Tray,
@@ -18,22 +17,8 @@ const http = require('node:http');
 const os = require('node:os');
 const { execFile } = require('node:child_process');
 const { promisify } = require('node:util');
-const { Readable } = require('node:stream');
 
 const execFileAsync = promisify(execFile);
-
-protocol.registerSchemesAsPrivileged([
-  {
-    scheme: 'quzhan-media',
-    privileges: {
-      standard: true,
-      secure: true,
-      supportFetchAPI: true,
-      stream: true,
-      bypassCSP: true,
-    },
-  },
-]);
 
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 
@@ -47,8 +32,6 @@ const AUDIO_EXTENSIONS = new Set([
   '.oga',
   '.opus',
   '.webm',
-  '.aiff',
-  '.aif',
 ]);
 
 const OPEN_WITH_EXTENSIONS = [...AUDIO_EXTENSIONS].map((extension) => extension.slice(1));
@@ -57,37 +40,151 @@ const ASSOCIATION_APP_NAME = 'Quzhan';
 const LEGACY_ASSOCIATION_PROG_ID = 'Lingyin.Audio';
 const LEGACY_ASSOCIATION_APP_NAME = 'Lingyin';
 
+const DEFAULT_SHORTCUTS = {
+  playPause: 'Space',
+  next: 'KeyD',
+  previous: 'KeyA',
+  seekForward: 'ArrowRight',
+  seekBackward: 'ArrowLeft',
+  desktopLyrics: 'KeyF',
+};
+const VALID_LANGUAGES = new Set(['en', 'zh-CN', 'zh-TW']);
+const VALID_THEMES = new Set(['cover', 'amber', 'tide', 'moss', 'berry', 'indigo']);
+
+const MAIN_I18N = {
+  en: {
+    chooseBackground: 'Choose a custom background',
+    importBackground: 'Use this image',
+    imageFiles: 'Image files',
+    importAudioTitle: 'Add music to the queue',
+    addToQueue: 'Add to queue',
+    audioFiles: 'Audio files',
+    allFiles: 'All files',
+    noAudioFiles: 'No supported audio files were found',
+    invalidAudioFile: 'Not a readable audio file',
+    unsupportedAudioFormat: 'Unsupported audio format',
+    defaultAppsOpened: 'Windows Default Apps is open. Confirm Quzhan there.',
+    defaultAppsUnavailable: 'Unable to open Windows Settings',
+    defaultAppsWindowsOnly: 'Default Apps settings are only available on Windows.',
+    trayOpen: 'Open Quzhan',
+    trayPlayPause: 'Play / Pause',
+    trayPrevious: 'Previous',
+    trayNext: 'Next',
+    traySettings: 'Settings',
+    trayQuit: 'Quit Quzhan',
+    trayTooltip: 'Quzhan',
+  },
+  'zh-CN': {
+    chooseBackground: '选择自定义背景',
+    importBackground: '使用这张图片',
+    imageFiles: '图片文件',
+    importAudioTitle: '把音乐加入播放队列',
+    addToQueue: '加入队列',
+    audioFiles: '音频文件',
+    allFiles: '所有文件',
+    noAudioFiles: '没有找到可导入的音频文件',
+    invalidAudioFile: '不是可读取的音频文件',
+    unsupportedAudioFormat: '不支持的音频格式',
+    defaultAppsOpened: '已打开 Windows 默认应用设置，请在系统界面确认曲栈。',
+    defaultAppsUnavailable: '无法打开 Windows 设置',
+    defaultAppsWindowsOnly: '默认应用设置仅适用于 Windows。',
+    trayOpen: '打开曲栈',
+    trayPlayPause: '播放 / 暂停',
+    trayPrevious: '上一首',
+    trayNext: '下一首',
+    traySettings: '设置',
+    trayQuit: '退出曲栈',
+    trayTooltip: '曲栈',
+  },
+  'zh-TW': {
+    chooseBackground: '選擇自訂背景',
+    importBackground: '使用這張圖片',
+    imageFiles: '圖片檔案',
+    importAudioTitle: '把音樂加入播放佇列',
+    addToQueue: '加入佇列',
+    audioFiles: '音訊檔案',
+    allFiles: '所有檔案',
+    noAudioFiles: '沒有找到可匯入的音訊檔案',
+    invalidAudioFile: '不是可讀取的音訊檔案',
+    unsupportedAudioFormat: '不支援的音訊格式',
+    defaultAppsOpened: '已開啟 Windows 預設應用程式設定，請在系統介面確認曲棧。',
+    defaultAppsUnavailable: '無法開啟 Windows 設定',
+    defaultAppsWindowsOnly: '預設應用程式設定僅適用於 Windows。',
+    trayOpen: '開啟曲棧',
+    trayPlayPause: '播放 / 暫停',
+    trayPrevious: '上一首',
+    trayNext: '下一首',
+    traySettings: '設定',
+    trayQuit: '結束曲棧',
+    trayTooltip: '曲棧',
+  },
+};
+
+function mainText(key) {
+  const language = lastState.settings?.language || 'zh-CN';
+  return MAIN_I18N[language]?.[key] || MAIN_I18N['zh-CN'][key] || key;
+}
+
+function remapLegacyCoverPath(value, legacyDir, targetCoverDir) {
+  if (typeof value !== 'string' || !value) return value;
+  const legacyCoverDir = path.resolve(legacyDir, 'covers');
+  const resolved = path.resolve(value);
+  const relative = path.relative(legacyCoverDir, resolved);
+  if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) return value;
+  return path.join(targetCoverDir, relative);
+}
+
+function migrateLegacyData(targetUserData) {
+  const targetLibrary = path.join(targetUserData, 'library.json');
+  if (fs.existsSync(targetLibrary)) return;
+
+  const appDataDir = path.dirname(targetUserData);
+  const legacyDirs = [
+    path.join(appDataDir, 'lingyin-player'),
+    path.join(appDataDir, '聆音'),
+    path.join(appDataDir, 'Lingyin'),
+  ];
+  const sourceDir = legacyDirs.find((dir) => fs.existsSync(path.join(dir, 'library.json')));
+  if (!sourceDir) return;
+
+  const sourceLibrary = path.join(sourceDir, 'library.json');
+  const targetCoverDir = path.join(targetUserData, 'covers');
+  try {
+    const raw = JSON.parse(fs.readFileSync(sourceLibrary, 'utf8'));
+    if (Array.isArray(raw.queue)) {
+      raw.queue = raw.queue.map((item) => {
+        if (!item || typeof item !== 'object') return item;
+        return {
+          ...item,
+          coverPath: remapLegacyCoverPath(item.coverPath, sourceDir, targetCoverDir),
+        };
+      });
+    }
+    fs.writeFileSync(targetLibrary, JSON.stringify(raw, null, 2), 'utf8');
+  } catch (error) {
+    console.warn('Unable to rewrite migrated library paths:', error);
+    fs.copyFileSync(sourceLibrary, targetLibrary);
+  }
+
+  for (const legacyDir of legacyDirs) {
+    const legacyCovers = path.join(legacyDir, 'covers');
+    if (!fs.existsSync(legacyCovers)) continue;
+    fs.cpSync(legacyCovers, targetCoverDir, {
+      recursive: true,
+      force: false,
+      errorOnExist: false,
+    });
+  }
+}
+
 if (process.env.QUZHAN_DATA_DIR) {
   app.setPath('userData', path.resolve(process.env.QUZHAN_DATA_DIR));
 } else if (app.isPackaged) {
   const appDataDir = app.getPath('appData');
   const targetUserData = path.join(appDataDir, 'quzhan-player');
-  const legacyUserDataDirs = [
-    path.join(appDataDir, 'lingyin-player'),
-    path.join(appDataDir, '聆音'),
-    path.join(appDataDir, 'Lingyin'),
-  ];
   try {
     fs.mkdirSync(targetUserData, { recursive: true });
-    if (!fs.existsSync(path.join(targetUserData, 'library.json'))) {
-      for (const legacyDir of legacyUserDataDirs) {
-        const legacyLibrary = path.join(legacyDir, 'library.json');
-        if (fs.existsSync(legacyLibrary)) {
-          fs.copyFileSync(legacyLibrary, path.join(targetUserData, 'library.json'));
-          break;
-        }
-      }
-    }
-    for (const legacyDir of legacyUserDataDirs) {
-      const legacyCovers = path.join(legacyDir, 'covers');
-      if (fs.existsSync(legacyCovers)) {
-        fs.cpSync(legacyCovers, path.join(targetUserData, 'covers'), {
-          recursive: true,
-          force: false,
-          errorOnExist: false,
-        });
-      }
-    }
+    migrateLegacyData(targetUserData);
   } catch (error) {
     console.warn('Unable to migrate previous app data:', error);
   }
@@ -104,13 +201,13 @@ const MIME_TYPES = {
   '.oga': 'audio/ogg',
   '.opus': 'audio/ogg',
   '.webm': 'audio/webm',
-  '.aiff': 'audio/aiff',
-  '.aif': 'audio/aiff',
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
   '.png': 'image/png',
   '.webp': 'image/webp',
   '.gif': 'image/gif',
+  '.bmp': 'image/bmp',
+  '.avif': 'image/avif',
 };
 
 const DEFAULT_STATE = {
@@ -132,6 +229,21 @@ const DEFAULT_STATE = {
     defaultVolume: 0.78,
     spectrumEnabled: true,
     closeAction: 'ask',
+    language: 'zh-CN',
+    theme: 'cover',
+    shortcuts: { ...DEFAULT_SHORTCUTS },
+    overlay: {
+      scale: 1,
+      opacity: 0.92,
+      locked: false,
+      clickThrough: false,
+    },
+    background: {
+      path: '',
+      blur: 18,
+      dim: 0.58,
+      motion: true,
+    },
   },
   updatedAt: 0,
 };
@@ -141,13 +253,16 @@ let overlayWindow = null;
 let lastState = { ...DEFAULT_STATE };
 let stateFile = '';
 let coverDir = '';
+let backgroundDir = '';
+let stateReadOk = false;
 let quitting = false;
-let importSequence = 0;
 let overlayPayload = null;
 let overlayPlayback = { time: 0, playing: false };
 let mediaServer = null;
 let mediaBaseUrl = '';
 const mediaToken = crypto.randomBytes(24).toString('hex');
+const allowedMediaPaths = new Set();
+let stateWriteTimer = null;
 let tray = null;
 let pendingOpenPaths = [];
 let pendingOpenDefaultSettings = false;
@@ -172,8 +287,56 @@ function cleanText(value, fallback = '') {
   return value.replace(/\u0000/g, '').trim() || fallback;
 }
 
+function cleanShortcut(value, fallback) {
+  if (typeof value !== 'string') return fallback;
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > 80 || !/^[A-Za-z0-9+]+$/.test(trimmed)) return fallback;
+  return trimmed;
+}
+
 function safeFileStem(value) {
   return value.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 80);
+}
+
+function mediaPathKey(filePath) {
+  if (typeof filePath !== 'string' || !filePath) return '';
+  const resolved = path.resolve(filePath);
+  return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
+}
+
+function allowMediaPath(filePath) {
+  const key = mediaPathKey(filePath);
+  if (key) allowedMediaPaths.add(key);
+}
+
+function isAllowedMediaPath(filePath) {
+  const key = mediaPathKey(filePath);
+  return Boolean(key && allowedMediaPaths.has(key));
+}
+
+function refreshAllowedMediaPaths() {
+  allowedMediaPaths.clear();
+  for (const item of lastState.queue || []) {
+    allowMediaPath(item.path);
+    allowMediaPath(item.coverPath);
+  }
+  allowMediaPath(lastState.settings?.background?.path);
+}
+
+function scheduleStateWrite() {
+  if (stateWriteTimer) return;
+  stateWriteTimer = setTimeout(() => {
+    stateWriteTimer = null;
+    writeStateAtomically();
+  }, 900);
+}
+
+function flushStateNow() {
+  if (stateWriteTimer) {
+    clearTimeout(stateWriteTimer);
+    stateWriteTimer = null;
+  }
+  writeStateAtomically();
 }
 
 function getWindowBounds(bounds) {
@@ -183,6 +346,42 @@ function getWindowBounds(bounds) {
   const x = Number.isFinite(Number(bounds.x)) ? Math.round(Number(bounds.x)) : undefined;
   const y = Number.isFinite(Number(bounds.y)) ? Math.round(Number(bounds.y)) : undefined;
   return { width, height, ...(Number.isFinite(x) ? { x } : {}), ...(Number.isFinite(y) ? { y } : {}) };
+}
+
+function getOverlayBounds(bounds) {
+  if (!bounds || typeof bounds !== 'object') return null;
+  const width = clampNumber(bounds.width, 300, 1400, 820);
+  const height = clampNumber(bounds.height, 80, 500, 172);
+  const x = Number.isFinite(Number(bounds.x)) ? Math.round(Number(bounds.x)) : undefined;
+  const y = Number.isFinite(Number(bounds.y)) ? Math.round(Number(bounds.y)) : undefined;
+  return { width, height, ...(Number.isFinite(x) ? { x } : {}), ...(Number.isFinite(y) ? { y } : {}) };
+}
+
+function fitBoundsToDisplays(bounds, fallbackWidth = 1360, fallbackHeight = 860) {
+  const candidate = getWindowBounds(bounds) || { width: fallbackWidth, height: fallbackHeight };
+  const displays = screen.getAllDisplays();
+  const primary = screen.getPrimaryDisplay();
+  const workArea = primary.workArea;
+  const width = Math.min(candidate.width, workArea.width);
+  const height = Math.min(candidate.height, workArea.height);
+  const hasVisibleArea = Number.isFinite(candidate.x) && Number.isFinite(candidate.y) &&
+    displays.some((display) => {
+      const area = display.workArea;
+      const overlapWidth = Math.min(candidate.x + width, area.x + area.width) -
+        Math.max(candidate.x, area.x);
+      const overlapHeight = Math.min(candidate.y + height, area.y + area.height) -
+        Math.max(candidate.y, area.y);
+      return overlapWidth >= 120 && overlapHeight >= 80;
+    });
+  if (!hasVisibleArea) {
+    return {
+      width,
+      height,
+      x: Math.round(workArea.x + (workArea.width - width) / 2),
+      y: Math.round(workArea.y + (workArea.height - height) / 2),
+    };
+  }
+  return { width, height, x: candidate.x, y: candidate.y };
 }
 
 function writeStateAtomically() {
@@ -221,6 +420,15 @@ function normalizeState(raw) {
   const validModes = new Set(['sequential', 'shuffle', 'repeat-one', 'selection']);
   const validCloseActions = new Set(['ask', 'tray', 'quit']);
   const rawSettings = raw.settings && typeof raw.settings === 'object' ? raw.settings : {};
+  const rawShortcuts = rawSettings.shortcuts && typeof rawSettings.shortcuts === 'object'
+    ? rawSettings.shortcuts
+    : {};
+  const rawOverlay = rawSettings.overlay && typeof rawSettings.overlay === 'object'
+    ? rawSettings.overlay
+    : {};
+  const rawBackground = rawSettings.background && typeof rawSettings.background === 'object'
+    ? rawSettings.background
+    : {};
   return {
     ...DEFAULT_STATE,
     ...raw,
@@ -238,7 +446,7 @@ function normalizeState(raw) {
       : [],
     desktopLyrics: Boolean(raw.desktopLyrics),
     windowBounds: getWindowBounds(raw.windowBounds),
-    overlayBounds: getWindowBounds(raw.overlayBounds),
+    overlayBounds: getOverlayBounds(raw.overlayBounds),
     settings: {
       defaultRate: clampNumber(
         rawSettings.defaultRate,
@@ -256,6 +464,31 @@ function normalizeState(raw) {
       closeAction: validCloseActions.has(rawSettings.closeAction)
         ? rawSettings.closeAction
         : 'ask',
+      language: VALID_LANGUAGES.has(rawSettings.language) ? rawSettings.language : 'zh-CN',
+      theme: VALID_THEMES.has(rawSettings.theme) ? rawSettings.theme : 'cover',
+      shortcuts: {
+        playPause: cleanShortcut(rawShortcuts.playPause, DEFAULT_SHORTCUTS.playPause),
+        next: cleanShortcut(rawShortcuts.next, DEFAULT_SHORTCUTS.next),
+        previous: cleanShortcut(rawShortcuts.previous, DEFAULT_SHORTCUTS.previous),
+        seekForward: cleanShortcut(rawShortcuts.seekForward, DEFAULT_SHORTCUTS.seekForward),
+        seekBackward: cleanShortcut(rawShortcuts.seekBackward, DEFAULT_SHORTCUTS.seekBackward),
+        desktopLyrics: cleanShortcut(
+          rawShortcuts.desktopLyrics,
+          DEFAULT_SHORTCUTS.desktopLyrics,
+        ),
+      },
+      overlay: {
+        scale: clampNumber(rawOverlay.scale, 0.7, 1.6, 1),
+        opacity: clampNumber(rawOverlay.opacity, 0.25, 1, 0.92),
+        locked: Boolean(rawOverlay.locked),
+        clickThrough: Boolean(rawOverlay.clickThrough),
+      },
+      background: {
+        path: typeof rawBackground.path === 'string' ? rawBackground.path : '',
+        blur: clampNumber(rawBackground.blur, 0, 40, 18),
+        dim: clampNumber(rawBackground.dim, 0, 0.9, 0.58),
+        motion: rawBackground.motion !== false,
+      },
     },
   };
 }
@@ -264,10 +497,20 @@ async function readState() {
   try {
     const text = await fsp.readFile(stateFile, 'utf8');
     lastState = normalizeState(JSON.parse(text));
+    stateReadOk = true;
   } catch (error) {
-    if (error.code !== 'ENOENT') console.error('Unable to load library state:', error);
+    if (error.code === 'ENOENT') stateReadOk = true;
+    else {
+      console.error('Unable to load library state:', error);
+      try {
+        fs.copyFileSync(stateFile, `${stateFile}.corrupt-${Date.now()}`);
+      } catch {
+        // Keep the original file untouched if the backup cannot be written.
+      }
+    }
     lastState = normalizeState(DEFAULT_STATE);
   }
+  refreshAllowedMediaPaths();
   return lastState;
 }
 
@@ -385,13 +628,95 @@ async function persistCover(picture, id) {
   const fileName = `${safeFileStem(id)}${extension}`;
   const outputPath = path.join(coverDir, fileName);
   await fsp.writeFile(outputPath, Buffer.from(picture.data));
+  allowMediaPath(outputPath);
   return outputPath;
+}
+
+const BACKGROUND_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp', '.avif']);
+
+async function importBackgroundImage() {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: mainText('chooseBackground'),
+    buttonLabel: mainText('importBackground'),
+    properties: ['openFile'],
+    filters: [
+      { name: mainText('imageFiles'), extensions: ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'avif'] },
+    ],
+  });
+  if (result.canceled || !result.filePaths.length) return null;
+  const source = result.filePaths[0];
+  const extension = path.extname(source).toLowerCase();
+  if (!BACKGROUND_EXTENSIONS.has(extension)) {
+    return { ok: false, code: 'UNSUPPORTED_IMAGE' };
+  }
+  await fsp.mkdir(backgroundDir, { recursive: true });
+  const target = path.join(
+    backgroundDir,
+    `background-${Date.now()}-${crypto.randomBytes(4).toString('hex')}${extension}`,
+  );
+  await fsp.copyFile(source, target);
+  allowMediaPath(target);
+  if (lastState.settings?.background) lastState.settings.background.path = target;
+  scheduleStateWrite();
+  return { ok: true, path: target, name: path.basename(source) };
+}
+
+async function cleanupOrphanCovers() {
+  if (!coverDir || !stateReadOk) return 0;
+  let entries;
+  try {
+    entries = await fsp.readdir(coverDir, { withFileTypes: true });
+  } catch {
+    return 0;
+  }
+  const referenced = new Set(
+    (lastState.queue || [])
+      .map((item) => (item.coverPath ? path.basename(item.coverPath) : ''))
+      .filter(Boolean),
+  );
+  let removed = 0;
+  for (const entry of entries) {
+    if (!entry.isFile() || referenced.has(entry.name)) continue;
+    try {
+      await fsp.unlink(path.join(coverDir, entry.name));
+      removed += 1;
+    } catch {
+      // A locked cover can be cleaned up on a later launch.
+    }
+  }
+  return removed;
+}
+
+async function cleanupOrphanBackgrounds() {
+  if (!backgroundDir || !stateReadOk) return 0;
+  const current = lastState.settings?.background?.path
+    ? mediaPathKey(lastState.settings.background.path)
+    : '';
+  let entries;
+  try {
+    entries = await fsp.readdir(backgroundDir, { withFileTypes: true });
+  } catch {
+    return 0;
+  }
+  let removed = 0;
+  for (const entry of entries) {
+    if (!entry.isFile()) continue;
+    const filePath = path.join(backgroundDir, entry.name);
+    if (current && mediaPathKey(filePath) === current) continue;
+    try {
+      await fsp.unlink(filePath);
+      removed += 1;
+    } catch {
+      // A locked background can be cleaned up on a later launch.
+    }
+  }
+  return removed;
 }
 
 async function parseAudio(filePath) {
   const stat = await fsp.stat(filePath);
-  if (!stat.isFile()) throw new Error('不是可读取的音频文件');
-  if (!isAudioFile(filePath)) throw new Error('不支持的音频格式');
+  if (!stat.isFile()) throw new Error(mainText('invalidAudioFile'));
+  if (!isAudioFile(filePath)) throw new Error(mainText('unsupportedAudioFormat'));
 
   const { parseFile, selectCover } = await import('music-metadata');
   let metadata = null;
@@ -435,6 +760,7 @@ async function parseAudio(filePath) {
 
 async function expandPaths(inputPaths) {
   const result = [];
+  const seen = new Set();
   const walk = async (target, depth = 0) => {
     if (depth > 8) return;
     let stat;
@@ -445,11 +771,18 @@ async function expandPaths(inputPaths) {
     }
     if (stat.isDirectory()) {
       const entries = await fsp.readdir(target, { withFileTypes: true });
+      entries.sort((a, b) =>
+        a.name.localeCompare(b.name, 'zh-CN', { numeric: true, sensitivity: 'base' }),
+      );
       for (const entry of entries) {
         await walk(path.join(target, entry.name), depth + 1);
       }
     } else if (stat.isFile() && isAudioFile(target)) {
-      result.push(target);
+      const key = mediaPathKey(target);
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        result.push(target);
+      }
     }
   };
   for (const target of inputPaths) {
@@ -458,14 +791,26 @@ async function expandPaths(inputPaths) {
   return [...new Set(result)];
 }
 
-async function importAudioPaths(inputPaths) {
-  const expanded = await expandPaths(Array.isArray(inputPaths) ? inputPaths : []);
+async function importAudioPaths(inputPaths, existingPaths = []) {
+  const expandedPaths = await expandPaths(Array.isArray(inputPaths) ? inputPaths : []);
+  const knownPaths = new Set(
+    (Array.isArray(existingPaths) ? existingPaths : []).map(mediaPathKey).filter(Boolean),
+  );
+  const expanded = expandedPaths.filter((filePath) => !knownPaths.has(mediaPathKey(filePath)));
+  const skipped = expandedPaths.length - expanded.length;
   if (!expanded.length) {
-    return { items: [], errors: [{ path: '', message: '没有找到可导入的音频文件' }] };
+    return {
+      items: [],
+      errors: skipped
+        ? []
+        : [{ path: '', code: 'NO_AUDIO_FILES', message: mainText('noAudioFiles') }],
+      skipped,
+    };
   }
 
   const items = [];
   const errors = [];
+  const order = new Map(expanded.map((filePath, index) => [filePath, index]));
   let cursor = 0;
   let finished = 0;
   const workers = Array.from({ length: Math.min(3, expanded.length) }, async () => {
@@ -474,9 +819,14 @@ async function importAudioPaths(inputPaths) {
       const filePath = expanded[index];
       try {
         const item = await parseAudio(filePath);
+        allowMediaPath(item.path);
         items.push(item);
       } catch (error) {
-        errors.push({ path: filePath, message: error.message || '导入失败' });
+        errors.push({
+          path: filePath,
+          code: error.code || 'IMPORT_FAILED',
+          message: error.message || '导入失败',
+        });
       } finally {
         finished += 1;
         if (mainWindow && !mainWindow.isDestroyed()) {
@@ -491,78 +841,8 @@ async function importAudioPaths(inputPaths) {
   });
   await Promise.all(workers);
 
-  items.sort((a, b) => expanded.indexOf(a.path) - expanded.indexOf(b.path));
-  return { items, errors };
-}
-
-function createMediaResponse(filePath, request) {
-  return new Promise(async (resolve) => {
-    try {
-      const stat = await fsp.stat(filePath);
-      const extension = path.extname(filePath).toLowerCase();
-      const mimeType = MIME_TYPES[extension] || 'application/octet-stream';
-      const rangeHeader = request.headers.get('range');
-
-      if (rangeHeader) {
-        const match = /^bytes=(\d*)-(\d*)$/i.exec(rangeHeader.trim());
-        if (!match) {
-          resolve(new Response(null, { status: 416, headers: { 'Content-Range': `bytes */${stat.size}` } }));
-          return;
-        }
-        const start = match[1] ? Number(match[1]) : 0;
-        const requestedEnd = match[2] ? Number(match[2]) : stat.size - 1;
-        const end = Math.min(Math.max(start, requestedEnd), stat.size - 1);
-        if (start >= stat.size || start > end) {
-          resolve(new Response(null, { status: 416, headers: { 'Content-Range': `bytes */${stat.size}` } }));
-          return;
-        }
-        const stream = fs.createReadStream(filePath, { start, end });
-        resolve(
-          new Response(Readable.toWeb(stream), {
-            status: 206,
-            headers: {
-              'Content-Type': mimeType,
-              'Content-Length': String(end - start + 1),
-              'Content-Range': `bytes ${start}-${end}/${stat.size}`,
-              'Accept-Ranges': 'bytes',
-              'Cache-Control': 'no-store',
-              'Access-Control-Allow-Origin': '*',
-            },
-          }),
-        );
-        return;
-      }
-
-      const stream = fs.createReadStream(filePath);
-      resolve(
-        new Response(Readable.toWeb(stream), {
-          status: 200,
-          headers: {
-            'Content-Type': mimeType,
-            'Content-Length': String(stat.size),
-            'Accept-Ranges': 'bytes',
-            'Cache-Control': 'no-store',
-            'Access-Control-Allow-Origin': '*',
-          },
-        }),
-      );
-    } catch (error) {
-      resolve(new Response(`Media unavailable: ${error.message}`, { status: 404 }));
-    }
-  });
-}
-
-function registerMediaProtocol() {
-  protocol.handle('quzhan-media', async (request) => {
-    try {
-      const url = new URL(request.url);
-      const filePath = url.searchParams.get('path');
-      if (!filePath) return new Response('Missing media path', { status: 400 });
-      return createMediaResponse(filePath, request);
-    } catch (error) {
-      return new Response(error.message, { status: 500 });
-    }
-  });
+  items.sort((a, b) => (order.get(a.path) ?? 0) - (order.get(b.path) ?? 0));
+  return { items, errors, skipped };
 }
 
 function startMediaServer() {
@@ -587,6 +867,11 @@ function startMediaServer() {
         if (!filePath) {
           response.writeHead(400, { ...corsHeaders, 'Content-Type': 'text/plain' });
           response.end('Missing media path');
+          return;
+        }
+        if (!isAllowedMediaPath(filePath)) {
+          response.writeHead(403, { ...corsHeaders, 'Content-Type': 'text/plain' });
+          response.end('Forbidden media path');
           return;
         }
         if (request.method === 'OPTIONS') {
@@ -717,7 +1002,7 @@ async function removeLegacyAudioAssociations() {
   await bestEffort(['delete', 'HKCU\\Software\\Lingyin\\Capabilities', '/f']);
   await bestEffort(['delete', `HKCU\\Software\\Classes\\${LEGACY_ASSOCIATION_PROG_ID}`, '/f']);
   await bestEffort(['delete', 'HKCU\\Software\\Classes\\Applications\\聆音.exe', '/f']);
-  for (const extension of OPEN_WITH_EXTENSIONS) {
+  for (const extension of [...OPEN_WITH_EXTENSIONS, 'aiff', 'aif']) {
     await bestEffort([
       'delete',
       `HKCU\\Software\\Classes\\.${extension}\\OpenWithProgids`,
@@ -866,7 +1151,7 @@ async function getAssociationStatus() {
 
 async function openDefaultAppsSettings() {
   if (process.platform !== 'win32') {
-    return { ok: false, message: '默认应用设置仅适用于 Windows。' };
+    return { ok: false, message: mainText('defaultAppsWindowsOnly') };
   }
   await registerAudioAssociations();
   try {
@@ -880,17 +1165,17 @@ async function openDefaultAppsSettings() {
     }
     return {
       ok: true,
-      message: '已打开 Windows 默认应用设置，请在系统界面确认曲栈。',
+      message: mainText('defaultAppsOpened'),
     };
   } catch (error) {
     try {
       await shell.openExternal('ms-settings:defaultapps');
       return {
         ok: true,
-        message: '已打开 Windows 默认应用设置，请在系统界面确认曲栈。',
+        message: mainText('defaultAppsOpened'),
       };
     } catch {
-      return { ok: false, message: `无法打开 Windows 设置：${error.message}` };
+      return { ok: false, message: `${mainText('defaultAppsUnavailable')}：${error.message}` };
     }
   }
 }
@@ -910,6 +1195,37 @@ function sendTrayAction(action) {
   mainWindow.webContents.send('tray:action', action);
 }
 
+function buildTrayMenu() {
+  return Menu.buildFromTemplate([
+    { label: mainText('trayOpen'), click: showMainWindow },
+    { type: 'separator' },
+    { label: mainText('trayPlayPause'), click: () => sendTrayAction('toggle-play') },
+    { label: mainText('trayPrevious'), click: () => sendTrayAction('previous') },
+    { label: mainText('trayNext'), click: () => sendTrayAction('next') },
+    {
+      label: mainText('traySettings'),
+      click: () => {
+        showMainWindow();
+        sendTrayAction('open-settings');
+      },
+    },
+    { type: 'separator' },
+    {
+      label: mainText('trayQuit'),
+      click: () => {
+        quitting = true;
+        app.quit();
+      },
+    },
+  ]);
+}
+
+function refreshTrayMenu() {
+  if (!tray) return;
+  tray.setContextMenu(buildTrayMenu());
+  tray.setToolTip(mainText('trayTooltip'));
+}
+
 function createTray() {
   if (tray) return tray;
   try {
@@ -920,27 +1236,7 @@ function createTray() {
     if (!icon.isEmpty()) icon = icon.resize({ width: 16, height: 16 });
     tray = new Tray(icon);
     tray.setToolTip('曲栈');
-    tray.setContextMenu(
-      Menu.buildFromTemplate([
-        { label: '打开曲栈', click: showMainWindow },
-        { type: 'separator' },
-        { label: '播放 / 暂停', click: () => sendTrayAction('toggle-play') },
-        { label: '上一首', click: () => sendTrayAction('previous') },
-        { label: '下一首', click: () => sendTrayAction('next') },
-        { label: '设置', click: () => {
-          showMainWindow();
-          sendTrayAction('open-settings');
-        } },
-        { type: 'separator' },
-        {
-          label: '退出曲栈',
-          click: () => {
-            quitting = true;
-            app.quit();
-          },
-        },
-      ]),
-    );
+    refreshTrayMenu();
     tray.on('click', showMainWindow);
     tray.on('double-click', showMainWindow);
   } catch (error) {
@@ -955,14 +1251,11 @@ function sendWindowState(window = mainWindow) {
 }
 
 function createMainWindow() {
-  const savedBounds = getWindowBounds(lastState.windowBounds) || {};
-  const workArea = screen.getPrimaryDisplay().workAreaSize;
-  const width = Math.min(savedBounds.width || 1360, workArea.width);
-  const height = Math.min(savedBounds.height || 860, workArea.height);
+  const savedBounds = fitBoundsToDisplays(lastState.windowBounds, 1360, 860);
 
   mainWindow = new BrowserWindow({
-    width,
-    height,
+    width: savedBounds.width,
+    height: savedBounds.height,
     x: savedBounds.x,
     y: savedBounds.y,
     minWidth: 980,
@@ -1023,7 +1316,7 @@ function createMainWindow() {
       }
     }, 700);
   });
-  if (process.env.QUZHAN_DEV_LOG) {
+  if (process.env.QUZHAN_DEV_LOG || process.argv.includes('--dev')) {
     mainWindow.webContents.on('console-message', (details) => {
       console.log(
         `[renderer:${details.level}] ${details.message} (${details.sourceId}:${details.lineNumber})`,
@@ -1229,6 +1522,139 @@ function createMainWindow() {
             `);
             console.log('Smoke settings change:', settingsResult);
           }
+          if (process.env.QUZHAN_SMOKE_FEATURES === '1') {
+            const featureResult = await mainWindow.webContents.executeJavaScript(`
+              (async () => {
+                const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+                document.getElementById('settingsButton').click();
+                await wait(220);
+                document.querySelector('[data-language="en"]').click();
+                await wait(260);
+                const enTitle = document.getElementById('settingsTitle').textContent;
+                const enQueue = document.getElementById('queueCount').textContent;
+                document.querySelector('[data-language="zh-TW"]').click();
+                await wait(260);
+                const twTitle = document.getElementById('settingsTitle').textContent;
+                document.querySelector('[data-language="zh-CN"]').click();
+                await wait(260);
+                const search = document.getElementById('queueSearchInput');
+                search.value = '潮汐';
+                search.dispatchEvent(new Event('input', { bubbles: true }));
+                await wait(180);
+                const searchCount = document.getElementById('queueCount').textContent;
+                const searchRows = document.querySelectorAll('.queue-row').length;
+                search.value = '';
+                search.dispatchEvent(new Event('input', { bubbles: true }));
+                document.querySelector('[data-queue-filter="played"]').click();
+                await wait(180);
+                const playedRows = document.querySelectorAll('.queue-row').length;
+                document.querySelector('[data-queue-filter="all"]').click();
+                const shortcutButton = document.querySelector(
+                  '[data-shortcut-action="next"]',
+                );
+                shortcutButton.click();
+                document.dispatchEvent(
+                  new KeyboardEvent('keydown', {
+                    code: 'KeyG',
+                    key: 'g',
+                    bubbles: true,
+                  }),
+                );
+                await wait(180);
+                const shortcutText = document.querySelector(
+                  '[data-shortcut-action="next"]',
+                ).textContent;
+                document.querySelector('[data-theme="tide"]').click();
+                await wait(220);
+                const themeAccent = getComputedStyle(document.documentElement)
+                  .getPropertyValue('--accent-rgb')
+                  .trim();
+                return {
+                  enTitle,
+                  enQueue,
+                  twTitle,
+                  searchCount,
+                  searchRows,
+                  playedRows,
+                  shortcutText,
+                  themeAccent,
+                  searchPlaceholder: search.placeholder,
+                };
+              })();
+            `);
+            console.log('Smoke features:', featureResult);
+          }
+          if (process.env.QUZHAN_SMOKE_OVERLAY_SWITCH === '1') {
+            const switchResult = await mainWindow.webContents.executeJavaScript(`
+              (async () => {
+                const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+                const audio = document.getElementById('audio');
+                audio.pause();
+                audio.currentTime = 0;
+                document.getElementById('desktopLyricsButton').click();
+                await wait(700);
+                document.querySelectorAll('.queue-row')[1].click();
+                await wait(600);
+                return {
+                  title: document.getElementById('trackTitle').textContent,
+                  firstLine: document.querySelector('.lyric-line')?.textContent || '',
+                };
+              })();
+            `);
+            let overlayLine = '';
+            if (overlayWindow && !overlayWindow.isDestroyed()) {
+              overlayLine = await overlayWindow.webContents.executeJavaScript(
+                `document.getElementById('currentLine').textContent`,
+              );
+            }
+            console.log('Smoke overlay switch:', { ...switchResult, overlayLine });
+          }
+          if (process.env.QUZHAN_SMOKE_SETTINGS_SCROLL) {
+            const scrollResult = await mainWindow.webContents.executeJavaScript(`
+              (async () => {
+                const panel = document.querySelector('.settings-scroll');
+                panel.scrollTop = ${Number(process.env.QUZHAN_SMOKE_SETTINGS_SCROLL) || 'panel.scrollHeight'};
+                await new Promise((resolve) => setTimeout(resolve, 300));
+                return { scrollTop: panel.scrollTop, scrollHeight: panel.scrollHeight };
+              })();
+            `);
+            console.log('Smoke settings scroll:', scrollResult);
+          }
+          if (process.env.QUZHAN_SMOKE_KEYS === '1') {
+            const keyResult = await mainWindow.webContents.executeJavaScript(`
+              (async () => {
+                const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+                const beforeTitle = document.getElementById('trackTitle').textContent;
+                document.dispatchEvent(
+                  new KeyboardEvent('keydown', { code: 'KeyD', key: 'd', bubbles: true }),
+                );
+                await wait(450);
+                const afterTitle = document.getElementById('trackTitle').textContent;
+                const beforeTime = document.getElementById('audio').currentTime;
+                document.dispatchEvent(
+                  new KeyboardEvent('keydown', {
+                    code: 'ArrowRight',
+                    key: 'ArrowRight',
+                    bubbles: true,
+                  }),
+                );
+                await wait(450);
+                const afterTime = document.getElementById('audio').currentTime;
+                document.dispatchEvent(
+                  new KeyboardEvent('keydown', { code: 'KeyF', key: 'f', bubbles: true }),
+                );
+                await wait(450);
+                return {
+                  beforeTitle,
+                  afterTitle,
+                  beforeTime,
+                  afterTime,
+                  lyricsButton: document.getElementById('desktopLyricsButton').textContent,
+                };
+              })();
+            `);
+            console.log('Smoke keys:', keyResult);
+          }
           if (process.env.QUZHAN_SMOKE_CLOSE_DIALOG === '1') {
             const closeResult = await mainWindow.webContents.executeJavaScript(`
               (async () => {
@@ -1305,17 +1731,68 @@ function sendOverlayState() {
   });
 }
 
+function overlayDimensions(scale = lastState.settings?.overlay?.scale) {
+  const safeScale = clampNumber(scale, 0.7, 1.6, 1);
+  return {
+    scale: safeScale,
+    width: Math.round(820 * safeScale),
+    height: Math.round(172 * safeScale),
+  };
+}
+
+function clampOverlayPosition(bounds, width, height) {
+  const displays = screen.getAllDisplays();
+  const primary = screen.getPrimaryDisplay();
+  const x = Number.isFinite(bounds?.x) ? Math.round(bounds.x) : null;
+  const y = Number.isFinite(bounds?.y) ? Math.round(bounds.y) : null;
+  const visible = x != null && y != null && displays.some((display) => {
+    const area = display.workArea;
+    return x + width > area.x && x < area.x + area.width &&
+      y + height > area.y && y < area.y + area.height;
+  });
+  if (visible) return { x, y, width, height };
+  const area = primary.workArea;
+  return {
+    x: Math.round(area.x + (area.width - width) / 2),
+    y: Math.round(area.y + area.height - height - 72),
+    width,
+    height,
+  };
+}
+
+function applyOverlayWindowSettings() {
+  if (!overlayWindow || overlayWindow.isDestroyed()) return;
+  const settings = lastState.settings?.overlay || {};
+  const { scale, width, height } = overlayDimensions(settings.scale);
+  const current = overlayWindow.getBounds();
+  const next = clampOverlayPosition(
+    {
+      x: current.x + (current.width - width) / 2,
+      y: current.y + (current.height - height) / 2,
+    },
+    width,
+    height,
+  );
+  overlayWindow.setBounds(next);
+  overlayWindow.webContents.setZoomFactor(scale);
+  overlayWindow.setOpacity(clampNumber(settings.opacity, 0.25, 1, 0.92));
+  overlayWindow.setIgnoreMouseEvents(Boolean(settings.clickThrough), { forward: true });
+  overlayWindow.webContents.send('overlay:settings', {
+    locked: Boolean(settings.locked),
+    clickThrough: Boolean(settings.clickThrough),
+  });
+}
+
 function createOverlayWindow() {
   if (overlayWindow && !overlayWindow.isDestroyed()) return overlayWindow;
-  const saved = getWindowBounds(lastState.overlayBounds) || {};
-  const workArea = screen.getPrimaryDisplay().workArea;
-  const width = 820;
-  const height = 172;
+  const { width, height } = overlayDimensions();
+  const saved = lastState.overlayBounds || {};
+  const initialBounds = clampOverlayPosition(saved, width, height);
   overlayWindow = new BrowserWindow({
     width,
     height,
-    x: Number.isFinite(saved.x) ? saved.x : Math.round(workArea.x + (workArea.width - width) / 2),
-    y: Number.isFinite(saved.y) ? saved.y : Math.round(workArea.y + workArea.height - height - 72),
+    x: initialBounds.x,
+    y: initialBounds.y,
     frame: false,
     transparent: true,
     resizable: false,
@@ -1339,11 +1816,13 @@ function createOverlayWindow() {
   overlayWindow.loadFile(path.join(__dirname, 'src', 'overlay.html'));
   overlayWindow.once('ready-to-show', () => {
     overlayWindow.showInactive();
+    applyOverlayWindowSettings();
     sendOverlayState();
   });
   overlayWindow.on('moved', () => {
     if (overlayWindow && !overlayWindow.isDestroyed()) {
       lastState.overlayBounds = overlayWindow.getBounds();
+      scheduleStateWrite();
     }
   });
   overlayWindow.on('closed', () => {
@@ -1372,7 +1851,7 @@ function setOverlayVisible(visible) {
 }
 
 function registerIpc() {
-  ipcMain.handle('app:get-state', async () => readState());
+  ipcMain.handle('app:get-state', async () => lastState);
   ipcMain.handle('app:info', () => ({
     version: app.getVersion(),
     userData: app.getPath('userData'),
@@ -1391,6 +1870,7 @@ function registerIpc() {
   });
   ipcMain.on('state:save', (_event, nextState) => {
     if (!nextState || typeof nextState !== 'object') return;
+    const previousLanguage = lastState.settings?.language;
     lastState = normalizeState({
       ...nextState,
       windowBounds: mainWindow && !mainWindow.isDestroyed()
@@ -1400,8 +1880,12 @@ function registerIpc() {
         ? overlayWindow.getBounds()
         : lastState.overlayBounds,
     });
+    refreshAllowedMediaPaths();
+    if (previousLanguage !== lastState.settings.language) refreshTrayMenu();
+    scheduleStateWrite();
   });
   ipcMain.handle('state:flush', (_event, nextState) => {
+    const previousLanguage = lastState.settings?.language;
     if (nextState && typeof nextState === 'object') {
       lastState = normalizeState({
         ...nextState,
@@ -1413,28 +1897,34 @@ function registerIpc() {
           : lastState.overlayBounds,
       });
     }
-    writeStateAtomically();
+    refreshAllowedMediaPaths();
+    if (previousLanguage !== lastState.settings.language) refreshTrayMenu();
+    flushStateNow();
     return true;
   });
-  ipcMain.handle('dialog:import-audio', async () => {
+  ipcMain.handle('dialog:import-audio', async (_event, existingPaths = []) => {
     const result = await dialog.showOpenDialog(mainWindow, {
-      title: '把音乐加入播放队列',
-      buttonLabel: '加入队列',
+      title: mainText('importAudioTitle'),
+      buttonLabel: mainText('addToQueue'),
       properties: ['openFile', 'multiSelections'],
       filters: [
         {
-          name: '音频文件',
-          extensions: ['mp3', 'flac', 'm4a', 'aac', 'wav', 'ogg', 'oga', 'opus', 'webm', 'aiff', 'aif'],
+          name: mainText('audioFiles'),
+          extensions: ['mp3', 'flac', 'm4a', 'aac', 'wav', 'ogg', 'oga', 'opus', 'webm'],
         },
-        { name: '所有文件', extensions: ['*'] },
+        { name: mainText('allFiles'), extensions: ['*'] },
       ],
     });
     if (result.canceled || !result.filePaths.length) return null;
-    return importAudioPaths(result.filePaths);
+    return importAudioPaths(result.filePaths, existingPaths);
   });
-  ipcMain.handle('audio:import-paths', async (_event, paths) => importAudioPaths(paths));
+  ipcMain.handle('audio:import-paths', async (_event, payload) => {
+    if (Array.isArray(payload)) return importAudioPaths(payload);
+    return importAudioPaths(payload?.paths, payload?.existingPaths);
+  });
   ipcMain.handle('cover:palette', async (_event, filePath) => {
     try {
+      if (!isAllowedMediaPath(filePath)) return null;
       return extractCoverPalette(filePath);
     } catch {
       return null;
@@ -1442,13 +1932,26 @@ function registerIpc() {
   });
   ipcMain.handle('cover:artwork', async (_event, filePath) => {
     try {
+      if (!isAllowedMediaPath(filePath)) return '';
       return coverArtworkDataUrl(filePath);
     } catch {
       return '';
     }
   });
+  ipcMain.handle('background:import', () => importBackgroundImage());
+  ipcMain.handle('background:clear', async () => {
+    const current = lastState.settings?.background?.path;
+    if (current && mediaPathKey(current).startsWith(mediaPathKey(backgroundDir))) {
+      await fsp.unlink(current).catch(() => {});
+    }
+    if (lastState.settings?.background) lastState.settings.background.path = '';
+    refreshAllowedMediaPaths();
+    scheduleStateWrite();
+    return true;
+  });
+  ipcMain.handle('covers:cleanup', () => cleanupOrphanCovers());
   ipcMain.handle('path:reveal', async (_event, filePath) => {
-    if (typeof filePath === 'string' && filePath) shell.showItemInFolder(filePath);
+    if (isAllowedMediaPath(filePath)) shell.showItemInFolder(filePath);
   });
   ipcMain.handle('window:minimize', () => mainWindow?.minimize());
   ipcMain.handle('window:toggle-maximize', () => {
@@ -1474,10 +1977,7 @@ function registerIpc() {
     return app.getPath('userData');
   });
   ipcMain.handle('associations:register', () => registerAudioAssociations());
-  ipcMain.handle('associations:status', async () => {
-    await registerAudioAssociations();
-    return getAssociationStatus();
-  });
+  ipcMain.handle('associations:status', () => getAssociationStatus());
   ipcMain.handle('associations:open-default-apps', () => openDefaultAppsSettings());
   ipcMain.handle('desktopLyrics:show', (_event, payload) => {
     overlayPayload = payload || null;
@@ -1488,6 +1988,21 @@ function registerIpc() {
   ipcMain.handle('desktopLyrics:hide', () => {
     setOverlayVisible(false);
     return false;
+  });
+  ipcMain.handle('desktopLyrics:configure', (_event, settings) => {
+    if (!settings || typeof settings !== 'object') return false;
+    const current = lastState.settings.overlay || {};
+    lastState.settings.overlay = {
+      scale: clampNumber(settings.scale, 0.7, 1.6, current.scale ?? 1),
+      opacity: clampNumber(settings.opacity, 0.25, 1, current.opacity ?? 0.92),
+      locked: Boolean(settings.locked),
+      clickThrough: Boolean(settings.clickThrough),
+    };
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+      applyOverlayWindowSettings();
+    }
+    scheduleStateWrite();
+    return true;
   });
   ipcMain.on('desktopLyrics:update', (_event, playback) => {
     overlayPlayback = {
@@ -1517,10 +2032,31 @@ app.whenReady().then(async () => {
   pendingOpenDefaultSettings = process.argv.includes('--open-default-apps');
   stateFile = path.join(app.getPath('userData'), 'library.json');
   coverDir = path.join(app.getPath('userData'), 'covers');
+  backgroundDir = path.join(app.getPath('userData'), 'backgrounds');
   await fsp.mkdir(coverDir, { recursive: true });
+  await fsp.mkdir(backgroundDir, { recursive: true });
   await readState();
+  if (process.env.QUZHAN_SMOKE_BACKGROUND) {
+    const backgroundPath = path.resolve(process.env.QUZHAN_SMOKE_BACKGROUND);
+    if (fs.existsSync(backgroundPath)) {
+      lastState.settings.background.path = backgroundPath;
+      allowMediaPath(backgroundPath);
+    }
+  }
+  if (process.env.QUZHAN_SMOKE_OVERLAY === '1') {
+    lastState.settings.overlay = {
+      scale: 1.2,
+      opacity: 0.7,
+      locked: true,
+      clickThrough: false,
+    };
+  }
+  if (['en', 'zh-CN', 'zh-TW'].includes(process.env.QUZHAN_SMOKE_LANGUAGE)) {
+    lastState.settings.language = process.env.QUZHAN_SMOKE_LANGUAGE;
+  }
+  await cleanupOrphanCovers();
+  await cleanupOrphanBackgrounds();
   await startMediaServer();
-  registerMediaProtocol();
   registerIpc();
   createMainWindow();
   createTray();
@@ -1557,7 +2093,7 @@ app.on('before-quit', () => {
   if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isMaximized()) {
     lastState.windowBounds = mainWindow.getBounds();
   }
-  writeStateAtomically();
+  flushStateNow();
 });
 
 app.on('window-all-closed', () => {

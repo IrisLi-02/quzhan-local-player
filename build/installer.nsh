@@ -2,6 +2,36 @@
 !include "nsDialogs.nsh"
 !include "LogicLib.nsh"
 
+!define MUI_LANGDLL_ALWAYSSHOW
+
+LangString QUZHAN_PAGE_TITLE 1033 "Shortcuts and file associations"
+LangString QUZHAN_PAGE_TITLE 2052 "快捷方式与文件关联"
+LangString QUZHAN_PAGE_TITLE 1028 "捷徑與檔案關聯"
+
+LangString QUZHAN_PAGE_SUBTITLE 1033 "Choose the Windows integration options you want after installation."
+LangString QUZHAN_PAGE_SUBTITLE 2052 "选择安装完成后需要的 Windows 集成选项。"
+LangString QUZHAN_PAGE_SUBTITLE 1028 "選擇安裝完成後需要的 Windows 整合選項。"
+
+LangString QUZHAN_PAGE_NOTE 1033 "Both options are off by default. The Start menu shortcut is always created."
+LangString QUZHAN_PAGE_NOTE 2052 "以下选项默认均不勾选。开始菜单快捷方式会正常创建。"
+LangString QUZHAN_PAGE_NOTE 1028 "以下選項預設均不勾選。開始功能表捷徑會正常建立。"
+
+LangString QUZHAN_DESKTOP_CHECK 1033 "Create a Quzhan desktop shortcut"
+LangString QUZHAN_DESKTOP_CHECK 2052 "在桌面创建“曲栈”快捷方式"
+LangString QUZHAN_DESKTOP_CHECK 1028 "在桌面建立「曲棧」捷徑"
+
+LangString QUZHAN_DEFAULT_CHECK 1033 "Set Quzhan as the default audio player (opens Windows confirmation after install)"
+LangString QUZHAN_DEFAULT_CHECK 2052 "将曲栈设为默认音频播放器（安装后打开 Windows 确认页）"
+LangString QUZHAN_DEFAULT_CHECK 1028 "將曲棧設為預設音訊播放器（安裝後開啟 Windows 確認頁）"
+
+LangString QUZHAN_ASSOC_NOTE 1033 "Windows 10/11 requires you to confirm default apps yourself. Upgrading keeps the existing installation folder and replaces the old version."
+LangString QUZHAN_ASSOC_NOTE 2052 "Windows 10/11 要求默认应用必须由用户本人在系统设置中确认。升级安装会沿用原安装位置并覆盖旧版本，不会额外安装一份。"
+LangString QUZHAN_ASSOC_NOTE 1028 "Windows 10/11 要求預設應用程式必須由使用者本人在系統設定中確認。升級安裝會沿用原安裝位置並覆蓋舊版本，不會額外安裝一份。"
+
+!macro preInit
+  StrCpy $LANGUAGE 1033
+!macroend
+
 !ifndef BUILD_UNINSTALLER
   Var DesktopShortcutCheckbox
   Var DesktopShortcutState
@@ -22,7 +52,7 @@
   !macroend
 
   Function DesktopShortcutPageCreate
-    !insertmacro MUI_HEADER_TEXT "快捷方式与文件关联" "选择安装完成后需要的 Windows 集成选项。"
+    !insertmacro MUI_HEADER_TEXT "$(QUZHAN_PAGE_TITLE)" "$(QUZHAN_PAGE_SUBTITLE)"
 
     nsDialogs::Create 1018
     Pop $0
@@ -30,22 +60,22 @@
       Abort
     ${EndIf}
 
-    ${NSD_CreateLabel} 0 0 100% 34u "以下选项默认均不勾选。开始菜单快捷方式会正常创建。"
+    ${NSD_CreateLabel} 0 0 100% 34u "$(QUZHAN_PAGE_NOTE)"
     Pop $0
 
-    ${NSD_CreateCheckbox} 0 42u 100% 20u "在桌面创建“曲栈”快捷方式"
+    ${NSD_CreateCheckbox} 0 42u 100% 20u "$(QUZHAN_DESKTOP_CHECK)"
     Pop $DesktopShortcutCheckbox
     ${If} $DesktopShortcutWanted == "1"
       ${NSD_Check} $DesktopShortcutCheckbox
     ${EndIf}
 
-    ${NSD_CreateCheckbox} 0 68u 100% 20u "将曲栈设为默认音频播放器（安装后打开 Windows 确认页）"
+    ${NSD_CreateCheckbox} 0 68u 100% 20u "$(QUZHAN_DEFAULT_CHECK)"
     Pop $DefaultPlayerCheckbox
     ${If} $DefaultPlayerWanted == "1"
       ${NSD_Check} $DefaultPlayerCheckbox
     ${EndIf}
 
-    ${NSD_CreateLabel} 0 101u 100% 42u "Windows 10/11 要求默认应用必须由用户本人在系统设置中确认。升级安装会沿用原安装位置并覆盖旧版本，不会额外安装一份。"
+    ${NSD_CreateLabel} 0 101u 100% 42u "$(QUZHAN_ASSOC_NOTE)"
     Pop $0
 
     nsDialogs::Show

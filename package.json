@@ -1,6 +1,6 @@
 {
   "name": "quzhan-player",
-  "version": "0.4.0",
+  "version": "0.5.1",
   "description": "曲栈 - 一个会记住你听到哪里的本地音乐播放器",
   "main": "main.cjs",
   "author": "Iris Li",
@@ -21,6 +21,7 @@
   "build": {
     "appId": "com.irisli.quzhan",
     "productName": "曲栈",
+    "electronDist": "node_modules/electron/dist",
     "asar": true,
     "files": [
       "main.cjs",
@@ -70,7 +71,14 @@
       "createDesktopShortcut": false,
       "createStartMenuShortcut": true,
       "shortcutName": "曲栈",
-      "include": "build/installer.nsh"
+      "include": "build/installer.nsh",
+      "displayLanguageSelector": true,
+      "installerLanguages": [
+        "en_US",
+        "zh_CN",
+        "zh_TW"
+      ],
+      "language": "1033"
     }
   }
 }

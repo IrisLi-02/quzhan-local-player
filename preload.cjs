@@ -7,10 +7,15 @@ contextBridge.exposeInMainWorld('quzhan', {
   getAppInfo: () => ipcRenderer.invoke('app:info'),
   saveState: (state) => ipcRenderer.send('state:save', state),
   flushState: (state) => ipcRenderer.invoke('state:flush', state),
-  importFromDialog: () => ipcRenderer.invoke('dialog:import-audio'),
-  importPaths: (paths) => ipcRenderer.invoke('audio:import-paths', paths),
+  importFromDialog: (existingPaths) =>
+    ipcRenderer.invoke('dialog:import-audio', existingPaths),
+  importPaths: (paths, existingPaths) =>
+    ipcRenderer.invoke('audio:import-paths', { paths, existingPaths }),
   getCoverPalette: (filePath) => ipcRenderer.invoke('cover:palette', filePath),
   getCoverArtwork: (filePath) => ipcRenderer.invoke('cover:artwork', filePath),
+  importBackground: () => ipcRenderer.invoke('background:import'),
+  clearBackground: () => ipcRenderer.invoke('background:clear'),
+  cleanupCovers: () => ipcRenderer.invoke('covers:cleanup'),
   getPathForFile: (file) => webUtils.getPathForFile(file),
   revealFile: (filePath) => ipcRenderer.invoke('path:reveal', filePath),
   minimize: () => ipcRenderer.invoke('window:minimize'),
@@ -41,6 +46,8 @@ contextBridge.exposeInMainWorld('quzhan', {
   },
   showDesktopLyrics: (payload) => ipcRenderer.invoke('desktopLyrics:show', payload),
   hideDesktopLyrics: () => ipcRenderer.invoke('desktopLyrics:hide'),
+  configureDesktopLyrics: (settings) =>
+    ipcRenderer.invoke('desktopLyrics:configure', settings),
   updateDesktopLyrics: (playback) => ipcRenderer.send('desktopLyrics:update', playback),
   onDesktopLyricsVisibility: (callback) => {
     const handler = (_event, value) => callback(Boolean(value));
