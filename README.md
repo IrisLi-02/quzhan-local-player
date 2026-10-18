@@ -61,6 +61,8 @@
 
 ## 运行与构建
 
+已发布版本和校验文件见 [GitHub Releases](https://github.com/IrisLi-02/quzhan-local-player/releases)。
+
 开发环境：
 
 - Windows 10/11 x64

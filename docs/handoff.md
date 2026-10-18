@@ -2,7 +2,7 @@
 
 最后更新：2026-10-18  
 当前分支：`main`  
-当前版本：`0.5.1`（已改版本号，尚未发布）  
+当前版本：`0.5.1`（已发布）  
 工作区：功能代码已修改，尚未提交 Git。
 
 ## 当前进度
@@ -82,8 +82,9 @@ npm run dist
 - 切歌后桌面歌词首行刷新正常。
 - `npm run dist` 使用本地 `node_modules\electron\dist` 成功生成便携版和 NSIS 安装版；自定义语言页和选项页编译通过。
 - 0.5.1 构建产物已生成：`dist/Quzhan-Portable-0.5.1-x64.exe`、`dist/Quzhan-Setup-0.5.1-x64.exe`。
-- 已把两个 0.5.1 安装包复制到本地 `release/`，并生成新的 `SHA256SUMS.txt`；尚未上传 GitHub。
+- 已把两个 0.5.1 安装包和 `SHA256SUMS.txt` 上传到 GitHub Release。
 - 打包版设置页实测版本号为 `V 0.5.1`，播放 `readyState=4`、`error=null`。
+- 已发布：commit `14eb036`，Release `v0.5.1`，便携版/安装版/校验和均为 uploaded 状态。
 
 `package.json` 已配置 `electronDist: node_modules/electron/dist`，因此完整构建不会再因
 electron-builder 下载 Electron 而卡住；前提是本地 Electron 二进制已安装。
@@ -96,7 +97,8 @@ electron-builder 下载 Electron 而卡住；前提是本地 Electron 二进制�
 - **背景复制到 `userData/backgrounds/`**：不依赖原始图片路径，避免用户移动原图后背景失效。
 - **背景和封面都走本地媒体服务白名单**：移除未使用的自定义协议，减少任意路径读取面。
 - **快捷键使用 `KeyboardEvent.code`**：不受输入法或键盘布局字符影响；录制时忽略单独修饰键。
-- **版本号已按用户要求改为 `0.5.1`**：功能和修复保留，尚未提交、打标签或发布到 GitHub。
+- **版本号已按用户要求改为 `0.5.1`**：功能和修复保留，已提交并发布。
+- **发布脚本不上传**：`一键发布.ps1` 与 `docs/GITHUB_发布指南.md` 已从仓库移除，README/使用说明不描述维护者的上传方式。
 - **不开发在线账号/链接模式**：无平台书面授权，不接入网易云/QQ 音乐账号、歌单同步或内嵌播放。
 
 ## 仍需注意
@@ -107,12 +109,12 @@ electron-builder 下载 Electron 而卡住；前提是本地 Electron 二进制�
 - `clickThrough` 开启后桌面歌词窗无法接收鼠标事件，必须先回主窗口设置关闭；设置页已有说明。
 - 媒体白名单主要防止渲染层随意读取路径，但 `state:save` 本身仍信任本地渲染层；若未来加入远程内容，需要进一步收紧。
 - 如果 `node_modules\electron\dist\electron.exe` 不存在，先运行 `node node_modules\electron\install.js`，否则打包无法使用本地 Electron。
-- 当前版本为 `0.5.1`；Release Notes 已更新，但尚未发布到 GitHub。
+- 当前版本为 `0.5.1`；Release Notes 已发布。
 
 ## 下一步建议
 
-1. 用户给下一条命令后，先确认是否需要发版和版本号策略。
-2. 若要发版：把本轮内容整理到 `RELEASE_NOTES.md`，更新 README/使用说明版本号，运行完整 `npm run dist` 并完成本地验收。
+1. `0.5.1` 已完成源码推送和 Release 发布。
+2. 后续改动按新版本号处理，并更新 `RELEASE_NOTES.md`、README/使用说明。
 3. 若要继续打磨：优先做队列虚拟列表、背景预览实时化、安装器三语逐页验收。
 4. 每次改动后按 `AGENTS.md` 的验收清单执行语法检查、`npm run pack`、隔离数据目录冒烟。
 
