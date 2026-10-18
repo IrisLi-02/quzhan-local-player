@@ -259,6 +259,7 @@
     '搜索歌曲、歌手或专辑': 'Search tracks, artists, or albums',
     '搜索播放列表': 'Search the play queue',
     '清除搜索': 'Clear search',
+    '定位到当前歌曲': 'Locate current track',
     '筛选': 'Filter',
     '筛选播放列表': 'Filter the play queue',
     '全部': 'All',

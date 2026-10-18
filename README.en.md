@@ -17,6 +17,7 @@ Quzhan does not upload music, connect to online catalogs, or require an account.
 - Restores the play queue, current track, playback position, playback mode, default volume, and default speed after restarting.
 - Imports files from a file picker or by dragging files and whole folders into the queue. New tracks are appended in import order.
 - Collapsible queue panel with single-click playback, long-press drag reordering, Ctrl multi-select, Shift range selection, move-to-top, move-to-bottom, and batch removal.
+- The queue automatically scrolls to the current track on track changes, with a Locate current track button in the queue header.
 - Sorts the queue by artist, song title using pinyin/letter order, or the original import order.
 - Main player controls include cover art, synchronized lyrics, seek bar, previous/next track, −10 s/+10 s seeking, volume, speed, sequential playback, round-aware shuffle, single-track loop, and a loop over selected tracks.
 - Reads embedded lyrics and sidecar `.lrc` files. Timed lyric lines can be clicked to seek.
@@ -29,6 +30,7 @@ Quzhan does not upload music, connect to online catalogs, or require an account.
 - Queue search across title, artist, album, and filename, with played/unplayed filters.
 - Desktop lyrics size and opacity controls, position locking, and click-through mode.
 - Custom local background images for the listening stage, with blur, dimming, and slow ambient motion; GIF and animated WebP keep their animation.
+- Cover copies are resized to a maximum edge of 640 px and deduplicated by content hash to keep the data folder small.
 - Registers supported audio formats with Windows “Open with” after the app runs. The Windows Default Apps page can be opened directly from Settings.
 - The first close action asks whether to minimize to the tray or fully quit, with an option to remember the choice.
 
@@ -63,8 +65,8 @@ Audio is streamed to Chromium from a temporary loopback-only local server. This 
 
 Check the repository's **Releases** page for:
 
-- `Quzhan-Setup-0.5.1-x64.exe` — installer
-- `Quzhan-Portable-0.5.1-x64.exe` — portable build
+- `Quzhan-Setup-0.6.0-x64.exe` — installer
+- `Quzhan-Portable-0.6.0-x64.exe` — portable build
 - `SHA256SUMS.txt` — release checksums
 
 The UI supports English, Simplified Chinese, and Traditional Chinese.
@@ -128,8 +130,8 @@ The application does not collect telemetry, send playback history, include adver
 This is a personal project and the first complete desktop application I have developed and published. It will continue to change based on real usage feedback.
 
 - Author: Iris Li
-- Contact: lhxttsbx@gmail.com
-- Version: `0.5.1`
+- Contact: IrisLi-02@outlook.com
+- Version: `0.6.0`
 - Platform: Windows 10/11 x64
 
 ### AI Assistance Disclosure
@@ -152,4 +154,4 @@ This project is not affiliated with or endorsed by any other music player or aud
 
 ## Feedback
 
-Bug reports, compatibility notes, and feature requests are welcome through GitHub Issues or `lhxttsbx@gmail.com`.
+Bug reports, compatibility notes, and feature requests are welcome through GitHub Issues or `IrisLi-02@outlook.com`.

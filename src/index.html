@@ -113,6 +113,11 @@
         <circle cx="10.8" cy="10.8" r="6.5" />
         <path d="m16 16 4 4" />
       </symbol>
+      <symbol id="i-locate" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="5.5" />
+        <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3" />
+        <circle class="fill" cx="12" cy="12" r="1.4" />
+      </symbol>
       <symbol id="i-close" viewBox="0 0 24 24">
         <path d="m6 6 12 12M18 6 6 18" />
       </symbol>
@@ -175,7 +180,7 @@
             <span></span><span></span><span></span><span></span>
           </div>
           <div class="brand-name">曲栈</div>
-          <div class="app-version" id="appVersion">V 0.5.1</div>
+          <div class="app-version" id="appVersion">V 0.6.0</div>
           <div class="brand-edition">LOCAL / 01</div>
         </div>
         <div class="titlebar-center" id="titlebarCenter">把每一次聆听留在原处</div>
@@ -326,6 +331,15 @@
               </div>
             </div>
             <div class="queue-header-actions">
+              <button
+                class="circle-button queue-locate-button"
+                id="queueLocateButton"
+                type="button"
+                title="定位到当前歌曲"
+                aria-label="定位到当前歌曲"
+              >
+                <svg><use href="#i-locate"></use></svg>
+              </button>
               <button
                 class="queue-sort-button"
                 id="queueSortButton"
@@ -940,9 +954,9 @@
                 </div>
               </div>
               <dl class="app-info-list">
-                <div><dt>版本</dt><dd id="settingsAppVersion">V 0.5.1</dd></div>
+                <div><dt>版本</dt><dd id="settingsAppVersion">V 0.6.0</dd></div>
                 <div><dt>作者</dt><dd>Iris Li</dd></div>
-                <div><dt>联系</dt><dd>lhxttsbx@gmail.com</dd></div>
+                <div><dt>联系</dt><dd>IrisLi-02@outlook.com</dd></div>
                 <div><dt>技术</dt><dd>Electron · Chromium · music-metadata</dd></div>
                 <div><dt>许可</dt><dd>保留所有权利，详见 LICENSE</dd></div>
               </dl>

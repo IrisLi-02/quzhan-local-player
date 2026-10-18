@@ -262,6 +262,7 @@ let mediaServer = null;
 let mediaBaseUrl = '';
 const mediaToken = crypto.randomBytes(24).toString('hex');
 const allowedMediaPaths = new Set();
+const optimizedCoverCache = new Map();
 let stateWriteTimer = null;
 let tray = null;
 let pendingOpenPaths = [];
@@ -292,10 +293,6 @@ function cleanShortcut(value, fallback) {
   const trimmed = value.trim();
   if (!trimmed || trimmed.length > 80 || !/^[A-Za-z0-9+]+$/.test(trimmed)) return fallback;
   return trimmed;
-}
-
-function safeFileStem(value) {
-  return value.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 80);
 }
 
 function mediaPathKey(filePath) {
@@ -408,6 +405,7 @@ function normalizeState(raw) {
           artist: cleanText(item.artist, '未知艺术家'),
           album: cleanText(item.album, ''),
           duration: clampNumber(item.duration, 0, 24 * 60 * 60, 0),
+          coverPath: optimizedCoverCache.get(item.id) || item.coverPath || '',
           played: Boolean(item.played),
           addedAt: Number(item.addedAt) || Date.now(),
           importOrder: Number.isFinite(Number(item.importOrder))
@@ -621,15 +619,99 @@ function coverArtworkDataUrl(filePath) {
 
 async function persistCover(picture, id) {
   if (!picture?.data) return '';
-  let extension = '.jpg';
-  if (picture.format === 'image/png') extension = '.png';
-  else if (picture.format === 'image/webp') extension = '.webp';
-  else if (picture.format === 'image/gif') extension = '.gif';
-  const fileName = `${safeFileStem(id)}${extension}`;
+  const pictureData = Buffer.from(picture.data);
+  const contentHash = crypto.createHash('sha256').update(pictureData).digest('hex').slice(0, 24);
+  const source = nativeImage.createFromBuffer(pictureData);
+  if (source.isEmpty()) {
+    let extension = '.jpg';
+    if (picture.format === 'image/png') extension = '.png';
+    else if (picture.format === 'image/webp') extension = '.webp';
+    else if (picture.format === 'image/gif') extension = '.gif';
+    const fallbackPath = path.join(coverDir, `cover-${contentHash}${extension}`);
+    if (!fs.existsSync(fallbackPath)) await fsp.writeFile(fallbackPath, pictureData);
+    optimizedCoverCache.set(id, fallbackPath);
+    allowMediaPath(fallbackPath);
+    return fallbackPath;
+  }
+  const size = source.getSize();
+  const scale = Math.min(1, 640 / Math.max(size.width, size.height));
+  const image = scale < 1
+    ? source.resize({
+      width: Math.max(1, Math.round(size.width * scale)),
+      height: Math.max(1, Math.round(size.height * scale)),
+      quality: 'good',
+    })
+    : source;
+  const fileName = `cover-${contentHash}-opt.jpg`;
   const outputPath = path.join(coverDir, fileName);
-  await fsp.writeFile(outputPath, Buffer.from(picture.data));
+  if (!fs.existsSync(outputPath)) {
+    await fsp.writeFile(outputPath, image.toJPEG(82));
+  }
+  optimizedCoverCache.set(id, outputPath);
   allowMediaPath(outputPath);
   return outputPath;
+}
+
+async function optimizeExistingCovers() {
+  if (!coverDir || !stateReadOk) return;
+  let changed = false;
+  let optimized = 0;
+  const updates = [];
+  for (const item of lastState.queue || []) {
+    if (!item?.id || !item.coverPath) continue;
+    if (optimizedCoverCache.has(item.id)) continue;
+    const currentName = path.basename(item.coverPath);
+    if (/^cover-[a-f0-9]{24}-opt\.jpg$/i.test(currentName) && fs.existsSync(item.coverPath)) {
+      optimizedCoverCache.set(item.id, item.coverPath);
+      allowMediaPath(item.coverPath);
+      continue;
+    }
+    try {
+      const originalData = await fsp.readFile(item.coverPath);
+      const contentHash = crypto.createHash('sha256')
+        .update(originalData)
+        .digest('hex')
+        .slice(0, 24);
+      const targetPath = path.join(coverDir, `cover-${contentHash}-opt.jpg`);
+      if (fs.existsSync(targetPath)) {
+        optimizedCoverCache.set(item.id, targetPath);
+        item.coverPath = targetPath;
+        allowMediaPath(targetPath);
+        changed = true;
+        updates.push({ id: item.id, path: targetPath });
+        continue;
+      }
+      const image = nativeImage.createFromPath(item.coverPath);
+      if (image.isEmpty()) continue;
+      const size = image.getSize();
+      const scale = Math.min(1, 640 / Math.max(size.width, size.height));
+      const resized = scale < 1
+        ? image.resize({
+          width: Math.max(1, Math.round(size.width * scale)),
+          height: Math.max(1, Math.round(size.height * scale)),
+          quality: 'good',
+        })
+        : image;
+      await fsp.writeFile(targetPath, resized.toJPEG(82));
+      optimizedCoverCache.set(item.id, targetPath);
+      item.coverPath = targetPath;
+      allowMediaPath(targetPath);
+      changed = true;
+      optimized += 1;
+      updates.push({ id: item.id, path: targetPath });
+      if (optimized % 12 === 0) await new Promise((resolve) => setImmediate(resolve));
+    } catch (error) {
+      console.warn(`Unable to optimize cover for ${item.id}:`, error.message);
+    }
+  }
+  if (!changed) return;
+  refreshAllowedMediaPaths();
+  flushStateNow();
+  if (updates.length && mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('covers:optimized', updates);
+  }
+  setTimeout(() => cleanupOrphanCovers().catch(() => {}), 5000);
+  console.log(`Optimized ${optimized} cover image(s).`);
 }
 
 const BACKGROUND_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp', '.avif']);
@@ -1655,6 +1737,37 @@ function createMainWindow() {
             `);
             console.log('Smoke keys:', keyResult);
           }
+          if (process.env.QUZHAN_SMOKE_LOCATE === '1') {
+            const locateResult = await mainWindow.webContents.executeJavaScript(`
+              (async () => {
+                const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+                const list = document.getElementById('queueList');
+                const rows = [...document.querySelectorAll('.queue-row')];
+                list.style.flex = '0 1 100px';
+                list.style.height = '100px';
+                rows[0]?.click();
+                await wait(450);
+                list.scrollTop = 0;
+                document.getElementById('nextButton').click();
+                await wait(550);
+                const defaultScrollTop = list.scrollTop;
+                list.scrollTop = 0;
+                document.getElementById('queueLocateButton').click();
+                await wait(700);
+                const active = document.querySelector('.queue-row.active');
+                const listRect = list.getBoundingClientRect();
+                const rowRect = active.getBoundingClientRect();
+                return {
+                  defaultScrollTop,
+                  locateScrollTop: list.scrollTop,
+                  activeVisible: rowRect.top >= listRect.top - 1 && rowRect.bottom <= listRect.bottom + 1,
+                  flash: active.classList.contains('locate-flash'),
+                  hasButton: Boolean(document.getElementById('queueLocateButton')),
+                };
+              })();
+            `);
+            console.log('Smoke locate:', locateResult);
+          }
           if (process.env.QUZHAN_SMOKE_CLOSE_DIALOG === '1') {
             const closeResult = await mainWindow.webContents.executeJavaScript(`
               (async () => {
@@ -2060,6 +2173,13 @@ app.whenReady().then(async () => {
   registerIpc();
   createMainWindow();
   createTray();
+  if (process.env.QUZHAN_SKIP_COVER_OPTIMIZE !== '1') {
+    setTimeout(() => {
+      optimizeExistingCovers().catch((error) => {
+        console.warn('Unable to optimize cover cache:', error);
+      });
+    }, 2500);
+  }
   registerAudioAssociations().catch((error) => {
     console.warn('Unable to register audio file associations:', error);
   });

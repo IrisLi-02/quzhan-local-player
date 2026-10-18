@@ -1252,6 +1252,16 @@ svg .seek-number {
   height: 14px;
 }
 
+.queue-locate-button {
+  width: 31px;
+  height: 31px;
+}
+
+.queue-locate-button svg {
+  width: 15px;
+  height: 15px;
+}
+
 .queue-sort-button:hover,
 .queue-sort-button.active {
   border-color: rgba(var(--accent-rgb), 0.28);
@@ -1590,6 +1600,25 @@ svg .seek-number {
     background 140ms ease,
     border-color 140ms ease,
     transform 170ms ease;
+}
+
+.queue-row.locate-flash {
+  animation: queue-locate-flash 1.25s var(--ease-out);
+}
+
+@keyframes queue-locate-flash {
+  0%,
+  100% {
+    box-shadow: none;
+  }
+  18% {
+    box-shadow:
+      inset 0 0 0 1px rgba(var(--accent-rgb), 0.75),
+      0 0 0 2px rgba(var(--accent-rgb), 0.12);
+  }
+  55% {
+    box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), 0.22);
+  }
 }
 
 .queue-row + .queue-row {

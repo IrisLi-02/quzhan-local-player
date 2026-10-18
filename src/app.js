@@ -31,6 +31,7 @@
     queueTotalDuration: $('#queueTotalDuration'),
     queueMenuButton: $('#queueMenuButton'),
     queueMenu: $('#queueMenu'),
+    queueLocateButton: $('#queueLocateButton'),
     queueSortButton: $('#queueSortButton'),
     sortPopover: $('#sortPopover'),
     sortPopoverClose: $('#sortPopoverClose'),
@@ -448,6 +449,17 @@
       });
   }
 
+  function resetQueueFilters() {
+    queueSearchQuery = '';
+    clearTimeout(queueSearchTimer);
+    queuePlayedFilter = 'all';
+    els.queueSearchInput.value = '';
+    $$('button', els.queueFilterOptions).forEach((entry) => {
+      entry.classList.toggle('selected', entry.dataset.queueFilter === 'all');
+    });
+    renderQueue({ keepScroll: true });
+  }
+
   function renderQueue(options = {}) {
     const scrollTop = options.keepScroll ? els.queueList.scrollTop : 0;
     const fragment = document.createDocumentFragment();
@@ -538,9 +550,41 @@
     updateFacts();
   }
 
-  function scrollCurrentIntoView() {
+  function scrollCurrentIntoView(options = {}) {
+    if (!currentItem()) return false;
+    if (!state.queueOpen) {
+      if (!options.expand) return false;
+      toggleQueue(true);
+      setTimeout(() => scrollCurrentIntoView({
+        ...options,
+        expand: false,
+      }), 480);
+      return true;
+    }
+    if (options.clearFilters && !els.queueList.querySelector('.queue-row.active')) {
+      resetQueueFilters();
+    }
     const row = els.queueList.querySelector('.queue-row.active');
-    if (row) row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    if (!row) return false;
+    const listRect = els.queueList.getBoundingClientRect();
+    const rowRect = row.getBoundingClientRect();
+    const top = els.queueList.scrollTop + rowRect.top - listRect.top -
+      Math.max(0, (listRect.height - rowRect.height) / 2);
+    els.queueList.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+    if (options.highlight) {
+      row.classList.remove('locate-flash');
+      void row.offsetWidth;
+      row.classList.add('locate-flash');
+      setTimeout(() => row.classList.remove('locate-flash'), 1400);
+    }
+    return true;
+  }
+
+  function scheduleCurrentIntoView(options = {}) {
+    requestAnimationFrame(() => {
+      scrollCurrentIntoView(options);
+      setTimeout(() => scrollCurrentIntoView(options), 100);
+    });
   }
 
   function updateFacts() {
@@ -1007,6 +1051,9 @@
   function toggleQueue(force) {
     state.queueOpen = typeof force === 'boolean' ? force : !state.queueOpen;
     renderQueueOpen();
+    if (state.queueOpen) {
+      setTimeout(() => scrollCurrentIntoView(), 90);
+    }
     scheduleSave(true);
   }
 
@@ -1478,7 +1525,7 @@
       sendDesktopLyricsPayload();
     }
     scheduleSave(true);
-    scrollCurrentIntoView();
+    scheduleCurrentIntoView();
     if (autoplay) {
       attemptPlay();
     }
@@ -2192,6 +2239,13 @@
       if (els.sortPopover.hidden) openSortPopover();
       else els.sortPopover.hidden = true;
     });
+    els.queueLocateButton.addEventListener('click', () => {
+      if (!currentItem()) {
+        showToast(t('当前还没有播放歌曲'));
+        return;
+      }
+      scrollCurrentIntoView({ expand: true, highlight: true, clearFilters: true });
+    });
     els.sortPopoverClose.addEventListener('click', () => {
       els.sortPopover.hidden = true;
     });
@@ -2229,17 +2283,7 @@
       });
       renderQueue({ keepScroll: true });
     });
-    const clearQueueFilters = () => {
-      queueSearchQuery = '';
-      clearTimeout(queueSearchTimer);
-      queuePlayedFilter = 'all';
-      els.queueSearchInput.value = '';
-      $$('button', els.queueFilterOptions).forEach((entry) => {
-        entry.classList.toggle('selected', entry.dataset.queueFilter === 'all');
-      });
-      renderQueue({ keepScroll: true });
-    };
-    els.clearQueueFiltersButton.addEventListener('click', clearQueueFilters);
+    els.clearQueueFiltersButton.addEventListener('click', resetQueueFilters);
 
     els.playButton.addEventListener('click', togglePlayPause);
     els.coverArtButton.addEventListener('click', togglePlayPause);
@@ -2738,6 +2782,20 @@
     });
     api.onSmokeImport(async (audioPath) => {
       if (audioPath) await addPaths([audioPath]);
+    });
+    api.onCoversOptimized((updates) => {
+      const paths = new Map(updates.map((entry) => [entry.id, entry.path]));
+      let changed = false;
+      for (const item of state.queue) {
+        const nextPath = paths.get(item.id);
+        if (nextPath && item.coverPath !== nextPath) {
+          item.coverPath = nextPath;
+          changed = true;
+        }
+      }
+      if (!changed) return;
+      if (currentItem()) renderTrack();
+      renderQueue({ keepScroll: true });
     });
   }
 

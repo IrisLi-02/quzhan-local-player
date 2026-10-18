@@ -10,7 +10,7 @@
 ## 项目快照
 
 - 产品名：曲栈 / Quzhan Local Player
-- 当前版本：`0.5.1`
+- 当前版本：`0.6.0`
 - 平台：Windows 10/11 x64
 - 技术栈：Electron 44、Chromium、原生 HTML/CSS/JavaScript、`music-metadata`
 - 主进程：`main.cjs`（CommonJS）
@@ -24,7 +24,7 @@
 使用语义化版本 `MAJOR.MINOR.PATCH`：
 
 - `MAJOR`：不兼容变更，例如旧版数据/配置无法迁移、公开行为被移除、发布方式发生破坏性变化。达到 `1.0.0` 后尤其严格。
-- `MINOR`：向后兼容的新功能，例如新增设置、主题、语言、搜索筛选。本轮 8 项功能原本可作为 `0.5.0`，最终按用户要求以 `0.5.1` 发布。
+- `MINOR`：向后兼容的新功能，例如新增设置、主题、语言、搜索筛选、队列定位。`0.6.0` 包含新功能和封面缓存优化。
 - `PATCH`：向后兼容的 Bug 修复、安全修复、性能优化、文案和小样式修正，例如 `0.4.1`。
 - `0.x` 阶段可以更灵活：不兼容变更通常进 `MINOR`，但仍应在 Release Notes 里明确说明。
 
@@ -51,8 +51,8 @@ node node_modules\electron\install.js
 npm start
 ```
 
-`npm run dev` 目前只是 `electron . --dev`；主进程没有读取 `--dev`，行为与
-`npm start` 基本相同。调试渲染进程时使用 `QUZHAN_DEV_LOG=1`。
+`npm run dev` 等同于 `npm start` 并传入 `--dev`，会启用渲染进程日志；也可以单独使用
+`QUZHAN_DEV_LOG=1`。
 
 ### 构建
 
@@ -141,6 +141,8 @@ node_modules\.bin\electron.cmd .
 | `QUZHAN_SMOKE_OVERLAY` | 验证桌面歌词缩放和不透明度设置 |
 | `QUZHAN_SMOKE_OVERLAY_SWITCH` | 验证切歌后桌面歌词刷新 |
 | `QUZHAN_SMOKE_KEYS` | 验证默认快捷键（下一首/后 10 秒/桌面歌词） |
+| `QUZHAN_SMOKE_LOCATE` | 验证切歌滚动和队列定位按钮 |
+| `QUZHAN_SKIP_COVER_OPTIMIZE` | 跳过启动后的封面缓存整理，用于稳定冒烟测试 |
 | `QUZHAN_SMOKE_SETTINGS_SCROLL` | 滚动设置页，用于检查下半部分布局 |
 
 冒烟结束后检查控制台输出和 `work/smoke.png`。测试产物都在 `work/`，不要提交。
@@ -203,6 +205,7 @@ node_modules\.bin\electron.cmd .
 - 新增主题时同时处理 `THEME_CONFIG`、主题色块、`applyTheme()` 和桌面歌词 payload。
 - 新增快捷键时同时处理 `SHORTCUT_ACTIONS`、默认值、冲突检测、录制状态和持久化。
 - 新增本地图片路径时，必须通过主进程 IPC 复制到应用数据目录，并加入 `allowedMediaPaths`；不要让渲染层直接读取任意路径。
+- 封面写入必须压缩到最长边 640px 并按内容哈希去重；不要直接保存原始内嵌封面，避免 `covers/` 长期膨胀。
 - 新增音频格式时同时处理：`AUDIO_EXTENSIONS`、`OPEN_WITH_EXTENSIONS`、`MIME_TYPES`、文件选择器过滤器、文档和真实播放验证。
 - 新增 IPC 时同时处理：preload 暴露、渲染层调用、错误处理、权限边界。
 - 保持现有视觉语言：深色背景、暖色强调、无边框窗口、圆角和细线；不要引入与现有界面冲突的组件库。
@@ -230,7 +233,7 @@ node_modules\.bin\electron.cmd .
 
 改动后至少执行：
 
-1. 五个 `node --check`。
+1. 六个 `node --check`（含 `src/i18n.js`）。
 2. `npm run pack`。
 3. 使用隔离 `QUZHAN_DATA_DIR` 跑一次播放冒烟，确认 `error: null`、`readyState` 正常、截图可打开。
 4. 如果改了队列：测试导入、排序、拖拽、删除、重启恢复。

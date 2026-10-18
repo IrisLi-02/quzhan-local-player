@@ -44,6 +44,11 @@ contextBridge.exposeInMainWorld('quzhan', {
     ipcRenderer.on('smoke:import', handler);
     return () => ipcRenderer.removeListener('smoke:import', handler);
   },
+  onCoversOptimized: (callback) => {
+    const handler = (_event, value) => callback(Array.isArray(value) ? value : []);
+    ipcRenderer.on('covers:optimized', handler);
+    return () => ipcRenderer.removeListener('covers:optimized', handler);
+  },
   showDesktopLyrics: (payload) => ipcRenderer.invoke('desktopLyrics:show', payload),
   hideDesktopLyrics: () => ipcRenderer.invoke('desktopLyrics:hide'),
   configureDesktopLyrics: (settings) =>
