@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">曲栈</string>
+    <string name="notification_channel_name">播放控制</string>
+    <string name="notification_channel_description">显示当前歌曲和播放控制</string>
+    <string name="notification_previous">上一首</string>
+    <string name="notification_next">下一首</string>
+    <string name="notification_play">播放</string>
+    <string name="notification_pause">暂停</string>
+    <string name="notification_stop">结束播放服务</string>
+</resources>

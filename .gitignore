@@ -24,6 +24,24 @@ __pycache__/
 *.opus
 *.aiff
 
+# Android build outputs and machine-local SDK configuration.
+android/.gradle/
+android/.kotlin/
+android/.idea/
+android/build/
+android/app/build/
+android/local.properties
+android/*.iml
+android/**/*.apk
+android/**/*.aab
+android/**/*.keystore
+android/**/*.jks
+
 # Local publishing helpers and upload guides stay out of the repository.
 一键发布*.ps1
 docs/*发布指南*
+
+# Internal development notes and agent instructions stay local only.
+AGENTS.md
+docs/handoff.md
+docs/法律与发布说明.md

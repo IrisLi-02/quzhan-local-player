@@ -1,0 +1,470 @@
+html.platform-android {
+  --titlebar-height: 44px;
+  --spectrum-height: 38px;
+  --dock-height: 136px;
+  --font-ui: "Noto Sans SC", "Noto Sans CJK SC", "Roboto", sans-serif;
+  --font-display: "Roboto", "Noto Sans SC", sans-serif;
+  --font-lyrics: "Noto Serif SC", "Noto Serif CJK SC", serif;
+}
+
+html.platform-android body {
+  overscroll-behavior: none;
+}
+
+html.platform-android .app-shell {
+  grid-template-rows:
+    var(--titlebar-height) minmax(0, 1fr) var(--spectrum-height)
+    var(--dock-height);
+}
+
+html.platform-android .titlebar {
+  padding: 0 14px;
+  -webkit-app-region: no-drag;
+}
+
+html.platform-android .brand-lockup {
+  gap: 8px;
+}
+
+html.platform-android .brand-name {
+  font-size: 15px;
+}
+
+html.platform-android .app-version {
+  display: none;
+}
+
+html.platform-android .brand-edition {
+  padding-left: 8px;
+}
+
+html.platform-android .titlebar-center {
+  padding: 0 8px;
+  font-size: 10px;
+}
+
+html.platform-android .window-controls,
+html.platform-android .desktop-lyrics-shortcut,
+html.platform-android #desktopLyricsButton,
+html.platform-android .settings-shortcuts,
+html.platform-android .settings-desktop-lyrics,
+html.platform-android .settings-windows-integration,
+html.platform-android .settings-close-action,
+html.platform-android #openUserDataButton,
+html.platform-android .close-dialog-backdrop,
+html.platform-android .dock-heart,
+html.platform-android .volume-wrap {
+  display: none !important;
+}
+
+html.platform-android .titlebar-actions {
+  padding-right: 0;
+}
+
+html.platform-android .android-only {
+  display: inline-flex;
+}
+
+html.platform-android .scan-music-button {
+  display: grid;
+}
+
+html.platform-android .selection-mode-toggle {
+  width: auto;
+  padding: 0 9px 0 7px;
+}
+
+html.platform-android .selection-mode-toggle span {
+  font-size: 10px;
+}
+
+html.platform-android .selection-mode-toggle.active {
+  background: rgba(var(--accent-rgb), 0.14);
+  color: var(--accent-soft);
+}
+
+html.platform-android .app-shell.mobile-selecting .drag-handle {
+  visibility: hidden;
+}
+
+html.platform-android .app-shell.mobile-selecting .row-selected-mark {
+  display: block;
+  width: 17px;
+  height: 17px;
+  border: 1px solid rgba(240, 230, 216, 0.42);
+  border-radius: 50%;
+  background: rgba(7, 10, 15, 0.76);
+}
+
+html.platform-android .app-shell.mobile-selecting .queue-row.selected .row-selected-mark {
+  border-color: var(--accent-soft);
+  background: var(--accent);
+  box-shadow: 0 0 0 2px rgba(7, 10, 15, 0.7);
+}
+
+html.platform-android .app-shell.mobile-selecting .queue-row.selected .row-selected-mark::after {
+  position: absolute;
+  top: 3px;
+  left: 5px;
+  width: 5px;
+  height: 8px;
+  border: solid #17120e;
+  border-width: 0 2px 2px 0;
+  content: "";
+  transform: rotate(45deg);
+}
+
+html.platform-android #queueEmptyScanButton {
+  margin-top: 8px;
+}
+
+html.platform-android .titlebar-button {
+  width: 42px;
+  height: 34px;
+}
+
+html.platform-android .workspace,
+html.platform-android .app-shell.queue-collapsed .workspace {
+  display: block;
+  position: relative;
+}
+
+html.platform-android .listening-stage {
+  height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  border-right: 0;
+  scrollbar-width: none;
+}
+
+html.platform-android .listening-stage::-webkit-scrollbar {
+  width: 0;
+}
+
+html.platform-android .stage-actions {
+  position: fixed;
+  z-index: 70;
+  top: calc(var(--titlebar-height) + 12px);
+  right: 14px;
+}
+
+html.platform-android .stage-actions .circle-button {
+  width: 38px;
+  height: 38px;
+  background: rgba(7, 10, 15, 0.72);
+}
+
+html.platform-android .now-playing-layout {
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+  gap: 24px;
+  padding: 46px 20px 24px;
+}
+
+html.platform-android .art-column {
+  width: 100%;
+  max-width: 420px;
+  margin: 0 auto;
+}
+
+html.platform-android .cover-composition {
+  width: min(62vw, 250px);
+  max-width: 250px;
+  margin: 0 auto;
+}
+
+html.platform-android .track-heading {
+  margin-top: 19px;
+  text-align: center;
+}
+
+html.platform-android .track-title {
+  font-size: clamp(27px, 8vw, 38px);
+  line-height: 1.2;
+}
+
+html.platform-android .track-byline {
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+html.platform-android .track-byline > span:not(.byline-dot) {
+  max-width: 100%;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+html.platform-android .track-facts {
+  justify-content: center;
+  margin-top: 18px;
+}
+
+html.platform-android .lyrics-panel {
+  position: relative;
+  width: 100%;
+  min-height: 330px;
+  flex: 0 0 330px;
+  border: 1px solid rgba(240, 230, 216, 0.055);
+  border-radius: 14px;
+  background: rgba(7, 10, 15, 0.34);
+}
+
+html.platform-android .lyrics-toolbar {
+  padding: 18px 18px 8px;
+}
+
+html.platform-android .lyrics-content {
+  padding: 40% 10px 48%;
+}
+
+html.platform-android .lyric-line {
+  font-size: 20px;
+}
+
+html.platform-android .lyric-line.active {
+  font-size: 25px;
+}
+
+html.platform-android .queue-panel {
+  position: fixed;
+  z-index: 80;
+  top: var(--titlebar-height);
+  right: 0;
+  bottom: calc(var(--spectrum-height) + var(--dock-height));
+  left: 0;
+  width: 100%;
+  border-left: 0;
+  transform: translateX(102%);
+  transition: transform 320ms var(--ease-out);
+  box-shadow: -24px 0 70px rgba(0, 0, 0, 0.45);
+}
+
+html.platform-android .app-shell:not(.queue-collapsed) .queue-panel {
+  transform: translateX(0);
+}
+
+html.platform-android .queue-panel .queue-empty {
+  top: 210px;
+  right: 18px;
+  left: 18px;
+}
+
+html.platform-android .queue-list.virtualized {
+  overflow-anchor: none;
+}
+
+html.platform-android .queue-list.virtualized .queue-virtual-content {
+  position: relative;
+  width: 100%;
+}
+
+html.platform-android .queue-list.virtualized .queue-row {
+  position: absolute;
+  right: 0;
+  left: 0;
+  height: 58px;
+  min-height: 58px;
+  margin: 0;
+}
+
+html.platform-android .queue-header {
+  padding-top: 18px;
+}
+
+html.platform-android .player-dock {
+  padding: 0 13px;
+}
+
+html.platform-android .progress-row {
+  grid-template-columns: 39px minmax(0, 1fr) 39px;
+  gap: 8px;
+  height: 32px;
+  padding-top: 5px;
+}
+
+html.platform-android .player-grid {
+  display: flex;
+  min-height: 82px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+}
+
+html.platform-android .dock-track {
+  order: 1;
+  min-width: 0;
+  flex: 1;
+  padding-right: 92px;
+}
+
+html.platform-android .dock-cover {
+  width: 38px;
+  height: 38px;
+}
+
+html.platform-android .transport {
+  order: 2;
+  width: 100%;
+  gap: clamp(1px, 1.2vw, 7px);
+}
+
+html.platform-android .transport-button,
+html.platform-android .transport-mode {
+  width: 33px;
+  height: 42px;
+}
+
+html.platform-android .transport-mode {
+  width: 42px;
+}
+
+html.platform-android .transport-button svg {
+  width: 19px;
+  height: 19px;
+}
+
+html.platform-android .play-button {
+  width: 48px;
+  height: 48px;
+  margin: 0 1px;
+}
+
+html.platform-android .dock-right {
+  position: absolute;
+  top: 14px;
+  right: 13px;
+  order: 3;
+  gap: 0;
+  margin-left: auto;
+}
+
+html.platform-android .dock-icon-button {
+  width: 36px;
+  height: 36px;
+}
+
+html.platform-android .spectrum-label {
+  top: 8px;
+  left: 14px;
+}
+
+html.platform-android .settings-backdrop {
+  padding: 0;
+}
+
+html.platform-android .settings-panel {
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: none;
+  border: 0;
+  border-radius: 0;
+}
+
+html.platform-android .settings-header {
+  padding-top: max(18px, env(safe-area-inset-top));
+}
+
+html.platform-android .settings-scroll {
+  padding-bottom: max(34px, env(safe-area-inset-bottom));
+}
+
+html.platform-android .settings-section {
+  padding-right: 18px;
+  padding-left: 18px;
+}
+
+html.platform-android .setting-row {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 12px;
+}
+
+html.platform-android .setting-row:not(.setting-row-stack) .switch-control {
+  align-self: flex-end;
+  margin-top: -38px;
+}
+
+html.platform-android .settings-segmented,
+html.platform-android .theme-grid,
+html.platform-android .settings-language {
+  width: 100%;
+}
+
+html.platform-android .settings-slider {
+  width: 100%;
+}
+
+html.platform-android .settings-slider input {
+  flex: 1;
+  width: auto;
+}
+
+html.platform-android .background-actions {
+  flex-wrap: wrap;
+}
+
+html.platform-android .settings-action-button {
+  min-width: 0;
+}
+
+html.platform-android .settings-update {
+  align-items: stretch;
+  flex-direction: column;
+}
+
+html.platform-android .settings-update-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+html.platform-android .settings-update-actions .settings-action-button {
+  width: 100%;
+}
+
+html.platform-android .popover,
+html.platform-android .mode-popover,
+html.platform-android .queue-menu,
+html.platform-android .sort-popover,
+html.platform-android .rate-popover {
+  max-width: calc(100vw - 24px);
+}
+
+html:not(.platform-android) .android-only {
+  display: none !important;
+}
+
+@media (max-width: 520px) {
+  html.platform-android .titlebar-center,
+  html.platform-android .brand-edition {
+    display: none;
+  }
+
+  html.platform-android .now-playing-layout {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+
+  html.platform-android .transport-mode:first-child,
+  html.platform-android .transport-mode:last-child {
+    display: none;
+  }
+}
+
+@media (max-height: 670px) {
+  html.platform-android {
+    --spectrum-height: 32px;
+    --dock-height: 122px;
+  }
+
+  html.platform-android .lyrics-panel {
+    min-height: 280px;
+    flex-basis: 280px;
+  }
+
+  html.platform-android .cover-composition {
+    width: min(46vw, 190px);
+  }
+}

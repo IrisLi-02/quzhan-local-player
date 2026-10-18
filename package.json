@@ -1,6 +1,6 @@
 {
   "name": "quzhan-player",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "曲栈 - 一个会记住你听到哪里的本地音乐播放器",
   "main": "main.cjs",
   "author": "Iris Li",

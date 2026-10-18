@@ -38,6 +38,8 @@
     selectionStrip: $('#selectionStrip'),
     selectionCount: $('#selectionCount'),
     clearSelectionButton: $('#clearSelectionButton'),
+    selectionTip: $('#selectionTip'),
+    selectionModeButton: $('#selectionModeButton'),
     selectAllButton: $('#selectAllButton'),
     moveTopButton: $('#moveTopButton'),
     moveBottomButton: $('#moveBottomButton'),
@@ -47,6 +49,8 @@
     removeTracksButton: $('#removeTracksButton'),
     addTracksButton: $('#addTracksButton'),
     queueEmptyAddButton: $('#queueEmptyAddButton'),
+    scanMusicButton: $('#scanMusicButton'),
+    queueEmptyScanButton: $('#queueEmptyScanButton'),
     emptyQueueButton: $('#emptyQueueButton'),
     coverArt: $('#coverArt'),
     coverFallback: $('#coverFallback'),
@@ -115,6 +119,12 @@
     settingsOverlayClickThrough: $('#settingsOverlayClickThrough'),
     settingsCloseOptions: $('#settingsCloseOptions'),
     settingsAppVersion: $('#settingsAppVersion'),
+    updateTitle: $('#updateTitle'),
+    updateStatus: $('#updateStatus'),
+    checkUpdateButton: $('#checkUpdateButton'),
+    installUpdateButton: $('#installUpdateButton'),
+    updateProgress: $('#updateProgress'),
+    updateProgressBar: $('#updateProgressBar'),
     defaultPlayerButton: $('#defaultPlayerButton'),
     defaultPlayerStatus: $('#defaultPlayerStatus'),
     openUserDataButton: $('#openUserDataButton'),
@@ -250,11 +260,20 @@
 
   let state = { ...defaultState };
   let selectedIds = new Set();
+  let mobileSelectionMode = false;
   let selectionAnchorId = null;
+  const QUEUE_ROW_HEIGHT = 58;
+  const QUEUE_VIRTUAL_THRESHOLD = 120;
+  const QUEUE_VIRTUAL_OVERSCAN = 8;
+  let queueRenderEntries = [];
+  let queueVirtualized = false;
+  let queueVirtualRange = { start: -1, end: -1 };
+  let queueScrollFrame = null;
   let lyricsModel = { lines: [], timed: false, source: '' };
   let currentLyricIndex = -1;
   let pendingRestoreTime = 0;
   let isScrubbing = false;
+  let audioTrackErrorHandler = null;
   let lastSavedVolume = 0.78;
   let importBusy = false;
   let saveTimer = null;
@@ -276,8 +295,11 @@
   let spectrumDpr = 1;
   let spectrumHeights = [];
   let spectrumAccentRgb = '230, 168, 115';
+  let lastSpectrumDraw = 0;
   let closeDialogOpen = false;
   let associationStatus = null;
+  let availableUpdate = null;
+  let updateBusy = false;
   let queueSearchQuery = '';
   let queuePlayedFilter = 'all';
   let shortcutRecording = null;
@@ -417,7 +439,13 @@
       if (!state.queue.some((item) => item.id === id)) selectedIds.delete(id);
     }
     const count = selectedIds.size;
-    els.selectionStrip.classList.toggle('visible', count > 0);
+    els.selectionStrip.classList.toggle('visible', count > 0 || mobileSelectionMode);
+    els.clearSelectionButton.textContent = mobileSelectionMode
+      ? t('退出选择')
+      : t('取消选择');
+    els.selectionTip.textContent = api.platform === 'android'
+      ? t('点按歌曲切换选中状态')
+      : t('Ctrl 点击多选 · Shift 选择区间');
     els.selectionCount.textContent = String(count);
     const disabled = count === 0;
     els.moveTopButton.disabled = disabled;
@@ -460,75 +488,122 @@
     renderQueue({ keepScroll: true });
   }
 
+  function createQueueRow(item, index) {
+    const isActive = item.id === state.currentId;
+    const isSelected = selectedIds.has(item.id);
+    const cover = mediaUrl(item.coverPath);
+    const row = document.createElement('div');
+    row.className = [
+      'queue-row',
+      isActive ? 'active' : '',
+      isActive && audio.paused ? 'paused' : '',
+      isSelected ? 'selected' : '',
+      item.missing ? 'missing' : '',
+    ]
+      .filter(Boolean)
+      .join(' ');
+    row.dataset.id = item.id;
+    row.tabIndex = 0;
+    row.setAttribute('role', 'button');
+    row.setAttribute(
+      'aria-label',
+      `${index + 1}. ${item.title}，${item.artist}${item.missing ? `，${t('文件不可用')}` : ''}`,
+    );
+    row.setAttribute('aria-current', isActive ? 'true' : 'false');
+
+    row.innerHTML = `
+      <div class="drag-handle" title="长按或拖动调整顺序" aria-hidden="true">
+        <svg><use href="#i-grip"></use></svg>
+      </div>
+      <div class="row-state">
+        <span class="row-number">${String(index + 1).padStart(2, '0')}</span>
+        <svg class="row-play-icon"><use href="#i-play"></use></svg>
+        <span class="eq-bars"><span></span><span></span><span></span></span>
+      </div>
+      <div class="row-art">
+        ${cover ? `<img alt="" src="${cover}">` : '<svg><use href="#i-note"></use></svg>'}
+        <span class="row-selected-mark"></span>
+      </div>
+      <div class="row-copy">
+        <div class="row-title">${escapeHtml(item.title)}</div>
+        <div class="row-subtitle">
+          ${item.missing ? `<span class="missing-tag">${escapeHtml(t('文件不可用'))}</span>` : ''}
+          <span>${escapeHtml(item.artist || t('未知艺术家'))}</span>
+        </div>
+      </div>
+      <div class="row-duration">${formatTime(item.duration)}</div>
+    `;
+
+    const coverImage = $('img', row);
+    if (coverImage) {
+      coverImage.addEventListener('error', () => {
+        coverImage.replaceWith(
+          Object.assign(document.createElementNS('http://www.w3.org/2000/svg', 'svg'), {
+            innerHTML: '<use href="#i-note"></use>',
+          }),
+        );
+      });
+    }
+    return row;
+  }
+
+  function renderQueueRows(entries, scrollTop, scrollOnly = false) {
+    queueVirtualized =
+      api.platform === 'android' && entries.length >= QUEUE_VIRTUAL_THRESHOLD;
+    els.queueList.classList.toggle('virtualized', queueVirtualized);
+
+    let start = 0;
+    let end = entries.length;
+    if (queueVirtualized) {
+      const viewportHeight = Math.max(1, els.queueList.clientHeight);
+      start = Math.max(
+        0,
+        Math.floor(scrollTop / QUEUE_ROW_HEIGHT) - QUEUE_VIRTUAL_OVERSCAN,
+      );
+      end = Math.min(
+        entries.length,
+        Math.ceil((scrollTop + viewportHeight) / QUEUE_ROW_HEIGHT) +
+          QUEUE_VIRTUAL_OVERSCAN,
+      );
+      if (
+        scrollOnly &&
+        queueVirtualRange.start === start &&
+        queueVirtualRange.end === end
+      ) {
+        return;
+      }
+    }
+    queueVirtualRange = { start, end };
+
+    if (queueVirtualized) {
+      const content = document.createElement('div');
+      content.className = 'queue-virtual-content';
+      content.style.height = `${entries.length * QUEUE_ROW_HEIGHT}px`;
+      for (let index = start; index < end; index += 1) {
+        const row = createQueueRow(entries[index].item, entries[index].index);
+        row.style.top = `${index * QUEUE_ROW_HEIGHT}px`;
+        content.appendChild(row);
+      }
+      els.queueList.replaceChildren(content);
+    } else {
+      const fragment = document.createDocumentFragment();
+      for (const entry of entries) {
+        fragment.appendChild(createQueueRow(entry.item, entry.index));
+      }
+      els.queueList.replaceChildren(fragment);
+    }
+    els.queueList.scrollTop = scrollTop;
+  }
+
   function renderQueue(options = {}) {
     const scrollTop = options.keepScroll ? els.queueList.scrollTop : 0;
-    const fragment = document.createDocumentFragment();
     const visibleEntries = visibleQueueEntries();
+    queueRenderEntries = visibleEntries;
     const hasFilter = Boolean(queueSearchQuery.trim()) || queuePlayedFilter !== 'all';
     const totalDuration = (hasFilter ? visibleEntries.map((entry) => entry.item) : state.queue)
       .reduce((sum, item) => sum + (Number(item.duration) || 0), 0);
 
-    visibleEntries.forEach(({ item, index }) => {
-      const isActive = item.id === state.currentId;
-      const isSelected = selectedIds.has(item.id);
-      const cover = mediaUrl(item.coverPath);
-      const row = document.createElement('div');
-      row.className = [
-        'queue-row',
-        isActive ? 'active' : '',
-        isActive && audio.paused ? 'paused' : '',
-        isSelected ? 'selected' : '',
-        item.missing ? 'missing' : '',
-      ]
-        .filter(Boolean)
-        .join(' ');
-      row.dataset.id = item.id;
-      row.tabIndex = 0;
-      row.setAttribute('role', 'button');
-      row.setAttribute(
-        'aria-label',
-        `${index + 1}. ${item.title}，${item.artist}${item.missing ? `，${t('文件不可用')}` : ''}`,
-      );
-      row.setAttribute('aria-current', isActive ? 'true' : 'false');
-
-      row.innerHTML = `
-        <div class="drag-handle" title="长按或拖动调整顺序" aria-hidden="true">
-          <svg><use href="#i-grip"></use></svg>
-        </div>
-        <div class="row-state">
-          <span class="row-number">${String(index + 1).padStart(2, '0')}</span>
-          <svg class="row-play-icon"><use href="#i-play"></use></svg>
-          <span class="eq-bars"><span></span><span></span><span></span></span>
-        </div>
-        <div class="row-art">
-          ${cover ? `<img alt="" src="${cover}">` : '<svg><use href="#i-note"></use></svg>'}
-          <span class="row-selected-mark"></span>
-        </div>
-        <div class="row-copy">
-          <div class="row-title">${escapeHtml(item.title)}</div>
-          <div class="row-subtitle">
-            ${item.missing ? `<span class="missing-tag">${escapeHtml(t('文件不可用'))}</span>` : ''}
-            <span>${escapeHtml(item.artist || t('未知艺术家'))}</span>
-          </div>
-        </div>
-        <div class="row-duration">${formatTime(item.duration)}</div>
-      `;
-
-      const coverImage = $('img', row);
-      if (coverImage) {
-        coverImage.addEventListener('error', () => {
-          coverImage.replaceWith(
-            Object.assign(document.createElementNS('http://www.w3.org/2000/svg', 'svg'), {
-              innerHTML: '<use href="#i-note"></use>',
-            }),
-          );
-        });
-      }
-      fragment.appendChild(row);
-    });
-
-    els.queueList.replaceChildren(fragment);
-    els.queueList.scrollTop = scrollTop;
+    renderQueueRows(visibleEntries, scrollTop);
     els.queueEmpty.hidden = state.queue.length > 0;
     els.queueNoResults.hidden = !(state.queue.length > 0 && !visibleEntries.length);
     els.queueList.hidden = visibleEntries.length === 0 && state.queue.length > 0;
@@ -564,9 +639,24 @@
     if (options.clearFilters && !els.queueList.querySelector('.queue-row.active')) {
       resetQueueFilters();
     }
-    const row = els.queueList.querySelector('.queue-row.active');
-    if (!row) return false;
     const listRect = els.queueList.getBoundingClientRect();
+    let row = els.queueList.querySelector('.queue-row.active');
+    if (!row && queueVirtualized) {
+      const visibleIndex = queueRenderEntries.findIndex(
+        (entry) => entry.item.id === state.currentId,
+      );
+      if (visibleIndex >= 0) {
+        const targetTop = Math.max(
+          0,
+          visibleIndex * QUEUE_ROW_HEIGHT -
+            Math.max(0, (listRect.height - QUEUE_ROW_HEIGHT) / 2),
+        );
+        els.queueList.scrollTop = targetTop;
+        renderQueueRows(queueRenderEntries, targetTop);
+        row = els.queueList.querySelector('.queue-row.active');
+      }
+    }
+    if (!row) return false;
     const rowRect = row.getBoundingClientRect();
     const top = els.queueList.scrollTop + rowRect.top - listRect.top -
       Math.max(0, (listRect.height - rowRect.height) / 2);
@@ -655,7 +745,10 @@
   function renderSortOptions() {
     els.queueSortButton.classList.toggle(
       'active',
-      currentSortMode === 'artist' || currentSortMode === 'title' || currentSortMode === 'default',
+      currentSortMode === 'artist' ||
+        currentSortMode === 'title' ||
+        currentSortMode === 'default' ||
+        currentSortMode === 'reverse',
     );
     $$('.sort-option', els.sortPopover).forEach((button) => {
       button.classList.toggle('selected', button.dataset.sort === currentSortMode);
@@ -691,6 +784,9 @@
           originalOrder(a, b),
       );
       showToast(t('已按歌名首字母排序'));
+    } else if (mode === 'reverse') {
+      state.queue.reverse();
+      showToast(t('已将当前列表倒序'));
     } else {
       state.queue.sort(originalOrder);
       showToast(t('已恢复最初导入顺序'));
@@ -705,6 +801,20 @@
   function markQueueCustomOrder() {
     currentSortMode = null;
     renderSortOptions();
+  }
+
+  function setMobileSelectionMode(force) {
+    if (api.platform !== 'android') return;
+    mobileSelectionMode = typeof force === 'boolean' ? force : !mobileSelectionMode;
+    els.appShell.classList.toggle('mobile-selecting', mobileSelectionMode);
+    els.selectionModeButton.classList.toggle('active', mobileSelectionMode);
+    els.selectionModeButton.title = mobileSelectionMode ? t('完成选择') : t('选择歌曲');
+    els.selectionModeButton.setAttribute('aria-label', els.selectionModeButton.title);
+    els.selectionModeButton.querySelector('span').textContent = mobileSelectionMode
+      ? t('完成')
+      : t('选择');
+    if (!mobileSelectionMode) selectedIds.clear();
+    renderQueue({ keepScroll: true });
   }
 
   function renderRate() {
@@ -893,6 +1003,120 @@
     });
   }
 
+  function setUpdateProgress(percent, message = '') {
+    const value = Number.isFinite(Number(percent))
+      ? clamp(Number(percent), 0, 100)
+      : 0;
+    els.updateProgress.hidden = false;
+    els.updateProgressBar.style.width = `${value}%`;
+    if (message) els.updateStatus.textContent = message;
+  }
+
+  async function checkForUpdates() {
+    if (updateBusy) return;
+    if (typeof api.checkForUpdate !== 'function') return;
+    updateBusy = true;
+    availableUpdate = null;
+    els.checkUpdateButton.disabled = true;
+    els.installUpdateButton.hidden = true;
+    els.updateProgress.hidden = true;
+    els.updateProgressBar.style.width = '0%';
+    els.updateTitle.textContent = t('检查更新');
+    els.updateStatus.textContent = t('正在检查更新…');
+    try {
+      const result = await api.checkForUpdate();
+      if (!result?.ok) {
+        els.updateStatus.textContent = result?.reason === 'no_asset'
+          ? t('当前发布页没有适用于本平台的安装包。')
+          : t('检查更新失败：{message}', {
+            message: result?.error || t('暂时无法获取更新信息，请检查网络后重试。'),
+          });
+        return;
+      }
+      if (!result.available) {
+        els.updateTitle.textContent = t('已是最新版本');
+        els.updateStatus.textContent = t('当前版本 v{version}', {
+          version: result.currentVersion,
+        });
+        return;
+      }
+      availableUpdate = result;
+      els.updateTitle.textContent = t('发现新版本 v{version}', {
+        version: result.latestVersion,
+      });
+      els.updateStatus.textContent = result.releaseName || '';
+      els.installUpdateButton.hidden = false;
+      els.installUpdateButton.disabled = false;
+    } catch (error) {
+      els.updateStatus.textContent = t('检查更新失败：{message}', {
+        message: error.message || t('暂时无法获取更新信息，请检查网络后重试。'),
+      });
+    } finally {
+      updateBusy = false;
+      els.checkUpdateButton.disabled = false;
+    }
+  }
+
+  async function installAvailableUpdate() {
+    if (!availableUpdate || updateBusy) return;
+    updateBusy = true;
+    els.checkUpdateButton.disabled = true;
+    els.installUpdateButton.disabled = true;
+    els.updateTitle.textContent = t('更新到 {version}', {
+      version: availableUpdate.latestVersion,
+    });
+    els.updateStatus.textContent = t('正在下载更新…');
+    setUpdateProgress(0);
+    try {
+      const result = await api.installUpdate(availableUpdate);
+      if (!result?.ok) {
+        let message = result?.error || t('更新失败：{message}', {
+          message: t('暂时无法获取更新信息，请检查网络后重试。'),
+        });
+        if (result?.code === 'SIGNATURE_MISMATCH') {
+          message = t('安装包签名与当前版本不一致，系统不会覆盖安装。');
+        } else if (result?.code === 'INSTALL_PERMISSION_REQUIRED') {
+          message = t('请允许曲栈安装未知应用后重试。');
+        } else if (result?.code === 'DEV_MODE') {
+          message = t('当前为开发模式，不能自动覆盖安装。');
+        } else if (result?.code === 'INVALID_PACKAGE') {
+          message = t('安装包无效或版本不高于当前版本。');
+        }
+        els.updateStatus.textContent = message;
+        els.installUpdateButton.disabled = false;
+        return;
+      }
+      setUpdateProgress(100);
+      els.updateStatus.textContent =
+        result.message || (api.platform === 'android'
+          ? t('下载完成，请按系统提示确认安装。')
+          : t('下载完成，正在启动安装程序…'));
+      if (result.installerStarted && api.platform !== 'android') {
+        setTimeout(() => api.quitApp().catch(() => {}), 1200);
+      }
+    } catch (error) {
+      els.updateStatus.textContent = t('更新失败：{message}', {
+        message: error.message || t('暂时无法获取更新信息，请检查网络后重试。'),
+      });
+      els.installUpdateButton.disabled = false;
+    } finally {
+      updateBusy = false;
+      els.checkUpdateButton.disabled = false;
+    }
+  }
+
+  function confirmAvailableUpdate() {
+    if (!availableUpdate || updateBusy) return;
+    askConfirm({
+      title: t('更新到 {version}', { version: availableUpdate.latestVersion }),
+      message: api.platform === 'android'
+        ? t('Android 将下载安装包并交由系统覆盖安装；播放队列、设置和已听标记会保留。')
+        : t('将下载安装包并覆盖安装当前版本；应用数据会保留。'),
+      acceptText: t('下载并更新'),
+      onAccept: installAvailableUpdate,
+    });
+  }
+
   function applyLanguage(language, options = {}) {
     if (!['en', 'zh-CN', 'zh-TW'].includes(language)) return;
     state.settings.language = language;
@@ -1059,7 +1283,9 @@
 
   function setEmptyTrackUI() {
     els.trackTitle.textContent = t('还没有正在播放的歌');
-    els.trackArtist.textContent = t('从队列里挑一首，或把音乐拖进来');
+    els.trackArtist.textContent = api.platform === 'android'
+      ? t('从队列里挑一首，或点击“添加”导入音乐')
+      : t('从队列里挑一首，或把音乐拖进来');
     els.trackAlbum.textContent = '';
     els.bylineDot.style.display = 'none';
     els.coverArt.removeAttribute('src');
@@ -1331,6 +1557,10 @@
     const hasTrack = Boolean(currentItem());
     els.spectrumStrip.classList.toggle('playing', playing);
     els.spectrumStatus.textContent = playing ? 'LIVE' : hasTrack ? 'PAUSED' : 'WAITING';
+    if (api.platform === 'android') {
+      if (playing) startSpectrumAnimation();
+      else stopSpectrumAnimation();
+    }
   }
 
   function ensureAudioGraph() {
@@ -1374,9 +1604,13 @@
 
   function drawSpectrum(timestamp) {
     spectrumFrame = requestAnimationFrame(drawSpectrum);
+    if (api.platform === 'android' && timestamp - lastSpectrumDraw < 32) return;
+    lastSpectrumDraw = timestamp;
     if (document.hidden || !spectrumWidth || !spectrumHeight) return;
     const context = els.spectrumCanvas.getContext('2d');
-    const barCount = Math.min(112, Math.max(42, Math.floor(spectrumWidth / 12)));
+    const barCount = api.platform === 'android'
+      ? Math.min(64, Math.max(32, Math.floor(spectrumWidth / 15)))
+      : Math.min(112, Math.max(42, Math.floor(spectrumWidth / 12)));
     if (spectrumHeights.length !== barCount) {
       spectrumHeights = new Array(barCount).fill(1.5);
     }
@@ -1450,6 +1684,7 @@
 
   function startSpectrumAnimation() {
     if (spectrumFrame || document.hidden || state.settings?.spectrumEnabled === false) return;
+    if (api.platform === 'android' && audio.paused) return;
     spectrumFrame = requestAnimationFrame(drawSpectrum);
   }
 
@@ -1514,6 +1749,7 @@
       pendingRestoreTime = Number(options.resumeTime) || 0;
     }
     audioErrorNotifiedFor = null;
+    bindTrackError(id);
     audio.src = mediaUrl(item.path);
     audio.playbackRate = Number(state.rate) || 1;
     audio.load();
@@ -1530,6 +1766,36 @@
       attemptPlay();
     }
     return true;
+  }
+
+  function bindTrackError(itemId) {
+    if (audioTrackErrorHandler) {
+      audio.removeEventListener('error', audioTrackErrorHandler);
+    }
+    audioTrackErrorHandler = () => {
+      updatePlayButton();
+      const item = state.queue.find((entry) => entry.id === itemId);
+      if (!item || state.currentId !== itemId || audioErrorNotifiedFor === itemId) return;
+      audioErrorNotifiedFor = itemId;
+      item.missing = true;
+      renderQueue({ keepScroll: true });
+      scheduleSave(true);
+      askConfirm({
+        title: t('无法播放这首歌'),
+        message: t('“{title}”可能已被移动、删除，或当前权限已失效。要将其从播放队列中移除吗？', {
+          title: item.title,
+        }),
+        acceptText: t('移出队列'),
+        onAccept: () => removeQueueItem(item.id),
+      });
+    };
+    audio.addEventListener('error', audioTrackErrorHandler);
+  }
+
+  function unbindTrackError() {
+    if (!audioTrackErrorHandler) return;
+    audio.removeEventListener('error', audioTrackErrorHandler);
+    audioTrackErrorHandler = null;
   }
 
   function attemptPlay() {
@@ -1699,6 +1965,39 @@
       });
     } finally {
       importBusy = false;
+    }
+  }
+
+  async function scanLocalMusic() {
+    if (api.platform !== 'android' || typeof api.scanLocalMusic !== 'function') return;
+    if (importBusy) {
+      showToast(t('正在导入上一批歌曲，请稍候'));
+      return;
+    }
+    const buttons = [
+      els.addTracksButton,
+      els.queueEmptyAddButton,
+      els.emptyQueueButton,
+      els.scanMusicButton,
+      els.queueEmptyScanButton,
+    ].filter(Boolean);
+    try {
+      importBusy = true;
+      buttons.forEach((button) => {
+        button.disabled = true;
+      });
+      showToast(t('正在扫描本地音乐…'), { duration: 5200 });
+      const result = await api.scanLocalMusic(state.queue.map((item) => item.path));
+      await handleImportResult(result);
+    } catch (error) {
+      showToast(t('扫描失败：{message}', {
+        message: error.message || t('未知错误'),
+      }), { error: true });
+    } finally {
+      importBusy = false;
+      buttons.forEach((button) => {
+        button.disabled = false;
+      });
     }
   }
 
@@ -1918,7 +2217,43 @@
     setTimeout(() => api.cleanupCovers().catch(() => {}), 500);
   }
 
+  function removeQueueItem(itemId) {
+    const item = state.queue.find((entry) => entry.id === itemId);
+    if (!item) return;
+    const wasPlaying = !audio.paused && state.currentId === itemId;
+    const currentRemoved = state.currentId === itemId;
+    const oldCurrentIndex = state.queue.findIndex((entry) => entry.id === itemId);
+    state.queue = state.queue.filter((entry) => entry.id !== itemId);
+    state.selectionLoopIds = state.selectionLoopIds.filter((id) => id !== itemId);
+    selectedIds.delete(itemId);
+    if (state.mode === 'selection' && !state.selectionLoopIds.length) {
+      state.mode = 'sequential';
+      renderMode();
+    }
+    if (currentRemoved) {
+      const next =
+        state.queue[Math.min(Math.max(oldCurrentIndex, 0), state.queue.length - 1)] ||
+        state.queue[0] ||
+        null;
+      if (next) {
+        loadTrack(next.id, wasPlaying);
+      } else {
+        stopPlayback();
+        state.currentId = null;
+        renderQueue();
+        setEmptyTrackUI();
+        if (state.desktopLyrics) toggleDesktopLyrics(false);
+      }
+    } else {
+      renderQueue({ keepScroll: true });
+    }
+    scheduleSave(true);
+    showToast(t('已从队列移出“{title}”', { title: item.title }));
+    setTimeout(() => api.cleanupCovers().catch(() => {}), 500);
+  }
+
   function stopPlayback() {
+    unbindTrackError();
     audio.pause();
     audio.removeAttribute('src');
     audio.load();
@@ -2207,11 +2542,18 @@
     els.addTracksButton.addEventListener('click', addTracks);
     els.queueEmptyAddButton.addEventListener('click', addTracks);
     els.emptyQueueButton.addEventListener('click', addTracks);
+    els.scanMusicButton.addEventListener('click', scanLocalMusic);
+    els.queueEmptyScanButton.addEventListener('click', scanLocalMusic);
     els.queueCollapseButton.addEventListener('click', () => toggleQueue(false));
     els.queueToggle.addEventListener('click', () => toggleQueue());
     els.titlebarQueueToggle.addEventListener('click', () => toggleQueue());
+    els.selectionModeButton.addEventListener('click', () => setMobileSelectionMode());
     els.selectAllButton.addEventListener('click', selectAll);
     els.clearSelectionButton.addEventListener('click', () => {
+      if (api.platform === 'android' && mobileSelectionMode) {
+        setMobileSelectionMode(false);
+        return;
+      }
       selectedIds.clear();
       renderQueue({ keepScroll: true });
     });
@@ -2361,6 +2703,8 @@
     els.desktopLyricsButton.addEventListener('click', () => toggleDesktopLyrics());
     els.desktopLyricsShortcut.addEventListener('click', () => toggleDesktopLyrics());
     els.settingsButton.addEventListener('click', openSettingsPanel);
+    els.checkUpdateButton.addEventListener('click', checkForUpdates);
+    els.installUpdateButton.addEventListener('click', confirmAvailableUpdate);
     els.settingsCloseButton.addEventListener('click', closeSettingsPanel);
     els.settingsBackdrop.addEventListener('click', (event) => {
       if (event.target === els.settingsBackdrop) closeSettingsPanel();
@@ -2508,6 +2852,7 @@
     els.confirmCancel.addEventListener('click', closeConfirm);
     els.confirmAccept.addEventListener('click', () => {
       const callback = confirmCallback;
+      closeConfirm();
       if (callback) callback();
     });
     els.confirmDialog.addEventListener('click', (event) => {
@@ -2519,6 +2864,10 @@
       const row = event.target.closest('.queue-row');
       if (!row) return;
       const id = row.dataset.id;
+      if (api.platform === 'android' && mobileSelectionMode) {
+        toggleQueueSelection(id, 'toggle', event);
+        return;
+      }
       if (event.ctrlKey || event.metaKey) {
         toggleQueueSelection(id, 'toggle', event);
         return;
@@ -2539,8 +2888,17 @@
       }
     });
 
+    els.queueList.addEventListener('scroll', () => {
+      if (!queueVirtualized || queueScrollFrame) return;
+      queueScrollFrame = requestAnimationFrame(() => {
+        queueScrollFrame = null;
+        renderQueueRows(queueRenderEntries, els.queueList.scrollTop, true);
+      });
+    }, { passive: true });
+
     els.queueList.addEventListener('pointerdown', (event) => {
       if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey) return;
+      if (api.platform === 'android' && mobileSelectionMode) return;
       const row = event.target.closest('.queue-row');
       if (!row) return;
       const onHandle = Boolean(event.target.closest('.drag-handle'));
@@ -2749,6 +3107,40 @@
     });
 
     window.addEventListener('beforeunload', flushState);
+    api.onUpdateProgress((progress) => {
+      if (!progress || typeof progress !== 'object') return;
+      if (Number.isFinite(Number(progress.percent))) {
+        setUpdateProgress(progress.percent);
+      }
+      if (progress.message) els.updateStatus.textContent = progress.message;
+    });
+    window.addEventListener('quzhan:track-metadata', (event) => {
+      const updates = Array.isArray(event.detail) ? event.detail : [];
+      if (!updates.length) return;
+      let changed = false;
+      let currentChanged = false;
+      for (const update of updates) {
+        const item = state.queue.find((entry) => entry.id === update.id);
+        if (!item) continue;
+        let itemChanged = false;
+        for (const key of ['coverPath', 'lyrics', 'lyricsSource', 'duration']) {
+          if (update[key] != null && item[key] !== update[key]) {
+            item[key] = update[key];
+            itemChanged = true;
+          }
+        }
+        if (!itemChanged) continue;
+        changed = true;
+        if (item.id === state.currentId) currentChanged = true;
+      }
+      if (!changed) return;
+      renderQueue({ keepScroll: true });
+      if (currentChanged) {
+        renderTrack();
+        updateLyricsUI();
+      }
+      scheduleSave(true);
+    });
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
         flushState();
@@ -2858,21 +3250,6 @@
     audio.addEventListener('ended', () => {
       updatePlayButton();
       nextTrack(false);
-    });
-    audio.addEventListener('error', () => {
-      updatePlayButton();
-      const item = currentItem();
-      if (!item || audioErrorNotifiedFor === item.id) return;
-      audioErrorNotifiedFor = item.id;
-      item.missing = true;
-      renderQueue({ keepScroll: true });
-      scheduleSave(true);
-      showToast(t('无法播放“{title}”，文件可能已移动或格式暂不支持', {
-        title: item.title,
-      }), {
-        error: true,
-        duration: 5200,
-      });
     });
   }
 

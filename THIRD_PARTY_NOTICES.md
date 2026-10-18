@@ -10,6 +10,9 @@ components; the project is not claiming ownership of them.
 | Node.js | Main-process JavaScript runtime | MIT and bundled third-party licenses |
 | music-metadata | Local audio metadata, cover art, and embedded lyric parsing | MIT |
 | electron-builder | Windows packaging | MIT |
+| AndroidX Activity / Core / Media | Android file picker integration, compatibility helpers, and media-session notification | Apache-2.0 |
+| Kotlin standard library | Android native host implementation | Apache-2.0 |
+| Android WebView | Android rendering and HTML audio playback | Android platform / Chromium open-source licenses |
 
 For complete dependency license texts, see the `LICENSE` files included in the
 corresponding npm packages and in the Electron distribution. No album artwork,

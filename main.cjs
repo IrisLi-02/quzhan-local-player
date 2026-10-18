@@ -4,6 +4,7 @@ const {
   dialog,
   ipcMain,
   Menu,
+  net,
   nativeImage,
   shell,
   screen,
@@ -15,7 +16,7 @@ const fsp = require('node:fs/promises');
 const crypto = require('node:crypto');
 const http = require('node:http');
 const os = require('node:os');
-const { execFile } = require('node:child_process');
+const { execFile, spawn } = require('node:child_process');
 const { promisify } = require('node:util');
 
 const execFileAsync = promisify(execFile);
@@ -50,6 +51,8 @@ const DEFAULT_SHORTCUTS = {
 };
 const VALID_LANGUAGES = new Set(['en', 'zh-CN', 'zh-TW']);
 const VALID_THEMES = new Set(['cover', 'amber', 'tide', 'moss', 'berry', 'indigo']);
+const UPDATE_API_URL = process.env.QUZHAN_UPDATE_URL ||
+  'https://api.github.com/repos/IrisLi-02/quzhan-local-player/releases/latest';
 
 const MAIN_I18N = {
   en: {
@@ -1492,6 +1495,11 @@ function createMainWindow() {
                 const titleOrder = readOrder();
                 document.getElementById('queueSortButton').click();
                 await wait(80);
+                document.querySelector('[data-sort="reverse"]').click();
+                await wait(350);
+                const reverseOrder = readOrder();
+                document.getElementById('queueSortButton').click();
+                await wait(80);
                 document.querySelector('[data-sort="default"]').click();
                 await wait(350);
                 const defaultOrder = readOrder();
@@ -1499,6 +1507,7 @@ function createMainWindow() {
                 await wait(250);
                 return {
                   titleOrder,
+                  reverseOrder,
                   defaultOrder,
                   sortPopoverHidden: document.getElementById('sortPopover').hidden,
                   sortPopoverDisplay: getComputedStyle(
@@ -1963,12 +1972,181 @@ function setOverlayVisible(visible) {
   writeStateAtomically();
 }
 
+function compareVersions(left, right) {
+  const parse = (value) => {
+    const normalized = String(value || '').replace(/^v/i, '').trim();
+    const [base, prerelease = ''] = normalized.split('-', 2);
+    const numbers = base.split('.').map((part) => Number.parseInt(part, 10) || 0);
+    while (numbers.length < 3) numbers.push(0);
+    return { numbers, prerelease };
+  };
+  const a = parse(left);
+  const b = parse(right);
+  for (let index = 0; index < Math.max(a.numbers.length, b.numbers.length); index += 1) {
+    const difference = (a.numbers[index] || 0) - (b.numbers[index] || 0);
+    if (difference) return difference > 0 ? 1 : -1;
+  }
+  if (!a.prerelease && b.prerelease) return 1;
+  if (a.prerelease && !b.prerelease) return -1;
+  if (!a.prerelease && !b.prerelease) return 0;
+  return a.prerelease.localeCompare(b.prerelease, 'en', { numeric: true });
+}
+
+async function fetchLatestRelease() {
+  const response = await net.fetch(UPDATE_API_URL, {
+    headers: {
+      Accept: 'application/vnd.github+json',
+      'User-Agent': `Quzhan/${app.getVersion()}`,
+    },
+  });
+  if (!response.ok) {
+    throw new Error(`GitHub API ${response.status}`);
+  }
+  return response.json();
+}
+
+async function checkForUpdate() {
+  try {
+    const release = await fetchLatestRelease();
+    const latestVersion = String(release.tag_name || release.name || '')
+      .replace(/^v/i, '')
+      .trim();
+    const setupAsset = Array.isArray(release.assets)
+      ? release.assets.find((asset) =>
+        /^Quzhan-Setup-.+-x64\.exe$/i.test(String(asset?.name || '')))
+      : null;
+    if (!setupAsset) {
+      return {
+        ok: false,
+        reason: 'no_asset',
+        currentVersion: app.getVersion(),
+        latestVersion,
+      };
+    }
+    return {
+      ok: true,
+      currentVersion: app.getVersion(),
+      latestVersion,
+      available: compareVersions(latestVersion, app.getVersion()) > 0,
+      releaseName: String(release.name || ''),
+      releaseNotes: String(release.body || ''),
+      assetName: String(setupAsset.name || ''),
+      assetUrl: String(setupAsset.browser_download_url || ''),
+      assetSize: Number(setupAsset.size) || 0,
+      digest: String(setupAsset.digest || ''),
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      currentVersion: app.getVersion(),
+      error: error.message || 'network error',
+    };
+  }
+}
+
+async function installUpdate(update) {
+  if (!app.isPackaged) {
+    return { ok: false, code: 'DEV_MODE', error: 'Development builds cannot self-update.' };
+  }
+  if (!update || typeof update !== 'object') {
+    return { ok: false, code: 'INVALID_UPDATE', error: 'Missing update metadata.' };
+  }
+  const assetName = String(update.assetName || '');
+  const assetUrl = String(update.assetUrl || '');
+  if (!/^Quzhan-Setup-.+-x64\.exe$/i.test(assetName)) {
+    return { ok: false, code: 'INVALID_UPDATE', error: 'Unexpected installer name.' };
+  }
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(assetUrl);
+  } catch {
+    return { ok: false, code: 'INVALID_UPDATE', error: 'Invalid installer URL.' };
+  }
+  if (parsedUrl.protocol !== 'https:' ||
+    !['github.com', 'objects.githubusercontent.com'].includes(parsedUrl.hostname)) {
+    return { ok: false, code: 'INVALID_UPDATE', error: 'Untrusted installer URL.' };
+  }
+
+  try {
+    const response = await net.fetch(assetUrl, {
+      headers: { 'User-Agent': `Quzhan/${app.getVersion()}` },
+      redirect: 'follow',
+    });
+    if (!response.ok || !response.body) {
+      throw new Error(`Download failed: ${response.status}`);
+    }
+    const total = Number(response.headers.get('content-length')) ||
+      Number(update.assetSize) ||
+      0;
+    const updateDir = await fsp.mkdtemp(path.join(app.getPath('temp'), 'quzhan-update-'));
+    const target = path.join(updateDir, assetName);
+    const reader = response.body.getReader();
+    const file = await fsp.open(target, 'w');
+    const hash = crypto.createHash('sha256');
+    let downloaded = 0;
+    let lastProgress = 0;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = Buffer.from(value);
+        hash.update(chunk);
+        await file.write(chunk);
+        downloaded += chunk.length;
+        const now = Date.now();
+        if (now - lastProgress > 180) {
+          lastProgress = now;
+          const percent = total > 0 ? (downloaded / total) * 100 : 0;
+          mainWindow?.webContents.send('update:progress', {
+            phase: 'download',
+            downloaded,
+            total,
+            percent,
+          });
+        }
+      }
+    } finally {
+      await file.close();
+    }
+    const digest = String(update.digest || '').toLowerCase();
+    if (digest.startsWith('sha256:')) {
+      const expected = digest.slice('sha256:'.length);
+      const actual = hash.digest('hex');
+      if (actual !== expected) {
+        await fsp.unlink(target).catch(() => {});
+        return { ok: false, code: 'CHECKSUM_MISMATCH', error: 'Downloaded file checksum mismatch.' };
+      }
+    }
+    flushStateNow();
+    const installer = spawn(target, ['/S'], {
+      detached: true,
+      stdio: 'ignore',
+      windowsHide: true,
+    });
+    await new Promise((resolve, reject) => {
+      installer.once('spawn', resolve);
+      installer.once('error', reject);
+    });
+    installer.unref();
+    setTimeout(() => app.quit(), 900);
+    return { ok: true, installerStarted: true, assetName };
+  } catch (error) {
+    return {
+      ok: false,
+      code: 'DOWNLOAD_FAILED',
+      error: error.message || 'Unable to download update.',
+    };
+  }
+}
+
 function registerIpc() {
   ipcMain.handle('app:get-state', async () => lastState);
   ipcMain.handle('app:info', () => ({
     version: app.getVersion(),
     userData: app.getPath('userData'),
   }));
+  ipcMain.handle('update:check', () => checkForUpdate());
+  ipcMain.handle('update:install', (_event, update) => installUpdate(update));
   ipcMain.on('media:origin', (event) => {
     event.returnValue = mediaBaseUrl;
   });

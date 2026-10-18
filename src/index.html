@@ -9,6 +9,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>曲栈</title>
     <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./android.css" />
   </head>
   <body>
     <svg class="svg-sprite" aria-hidden="true">
@@ -155,6 +156,9 @@
         <circle cx="16.6" cy="13.4" r="5.4" />
         <path d="M16.6 10.3v3.2l2.2 1.3" />
       </symbol>
+      <symbol id="i-sort-reverse" viewBox="0 0 24 24">
+        <path d="M7 4v16M4 7l3-3 3 3M17 20V4M14 17l3 3 3-3" />
+      </symbol>
       <symbol id="i-settings" viewBox="0 0 24 24">
         <circle cx="12" cy="12" r="3.1" />
         <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06-2.87 2.87-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21H9.5v-.1A1.7 1.7 0 0 0 8.4 19.4a1.7 1.7 0 0 0-1.87.34l-.06.06-2.87-2.87.06-.06A1.7 1.7 0 0 0 4 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H2.1V9.5h.2A1.7 1.7 0 0 0 4 8.4a1.7 1.7 0 0 0-.34-1.87l-.06-.06L6.5 3.6l.06.06A1.7 1.7 0 0 0 8.4 4a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V2.1h4.1v.2A1.7 1.7 0 0 0 15 4a1.7 1.7 0 0 0 1.87-.34l.06-.06 2.87 2.87-.06.06A1.7 1.7 0 0 0 19.4 8.4c.12.37.33.72.6 1 .3.28.68.42 1.1.4h.1v4.1h-.1A1.7 1.7 0 0 0 19.4 15Z" />
@@ -180,7 +184,7 @@
             <span></span><span></span><span></span><span></span>
           </div>
           <div class="brand-name">曲栈</div>
-          <div class="app-version" id="appVersion">V 0.6.0</div>
+          <div class="app-version" id="appVersion">V 0.6.1</div>
           <div class="brand-edition">LOCAL / 01</div>
         </div>
         <div class="titlebar-center" id="titlebarCenter">把每一次聆听留在原处</div>
@@ -341,6 +345,15 @@
                 <svg><use href="#i-locate"></use></svg>
               </button>
               <button
+                class="circle-button android-only scan-music-button"
+                id="scanMusicButton"
+                type="button"
+                title="扫描本地音乐"
+                aria-label="扫描本地音乐"
+              >
+                <svg><use href="#i-note"></use></svg>
+              </button>
+              <button
                 class="queue-sort-button"
                 id="queueSortButton"
                 type="button"
@@ -367,6 +380,16 @@
             <button class="queue-action primary" id="addTracksButton" type="button" title="浏览本地音频">
               <svg><use href="#i-add"></use></svg>
               <span>添加</span>
+            </button>
+            <button
+              class="queue-action selection-mode-toggle android-only"
+              id="selectionModeButton"
+              type="button"
+              title="选择歌曲"
+              aria-label="选择歌曲"
+            >
+              <svg><use href="#i-select-all"></use></svg>
+              <span>选择</span>
             </button>
             <span class="toolbar-divider"></span>
             <button class="queue-action" id="selectAllButton" type="button" title="全选队列" aria-label="全选队列">
@@ -396,7 +419,7 @@
           <div class="selection-strip" id="selectionStrip">
             <span><strong id="selectionCount">0</strong> 首已选</span>
             <button type="button" id="clearSelectionButton">取消选择</button>
-            <span class="selection-tip">Ctrl 点击多选 · Shift 选择区间</span>
+            <span class="selection-tip" id="selectionTip">Ctrl 点击多选 · Shift 选择区间</span>
           </div>
 
           <div class="queue-search-block">
@@ -439,10 +462,14 @@
               <svg><use href="#i-note"></use></svg>
             </div>
             <h3>队列还是空的</h3>
-            <p>点“添加”选择音乐，或把文件直接拖到这里。退出后队列会留在原处。</p>
+            <p>点“添加”选择本地音乐。导入后队列会留在原处。</p>
             <button class="outline-button" id="queueEmptyAddButton" type="button">
               <svg><use href="#i-add"></use></svg>
               选择本地音乐
+            </button>
+            <button class="outline-button android-only" id="queueEmptyScanButton" type="button">
+              <svg><use href="#i-note"></use></svg>
+              扫描本地音乐
             </button>
           </div>
 
@@ -660,6 +687,11 @@
           <span><strong>按首字母排序</strong><small>按歌名拼音或字母顺序排列</small></span>
           <span class="sort-check"></span>
         </button>
+        <button class="sort-option" type="button" data-sort="reverse" role="menuitem">
+          <span class="sort-option-icon"><svg><use href="#i-sort-reverse"></use></svg></span>
+          <span><strong>倒序</strong><small>把当前列表的顺序完全倒过来</small></span>
+          <span class="sort-check"></span>
+        </button>
         <button class="sort-option" type="button" data-sort="default" role="menuitem">
           <span class="sort-option-icon"><svg><use href="#i-sort-time"></use></svg></span>
           <span><strong>恢复默认顺序</strong><small>恢复为歌曲最初加入播放队列的顺序</small></span>
@@ -703,7 +735,7 @@
               <div class="setting-row setting-row-stack">
                 <div class="setting-copy">
                   <strong>界面主题</strong>
-                  <small>边框、强调色和桌面歌词会跟随所选配色</small>
+                  <small>边框和强调色会跟随所选配色</small>
                 </div>
                 <div class="theme-grid" id="settingsThemeOptions">
                   <button type="button" data-theme="cover">
@@ -798,7 +830,7 @@
               </div>
             </section>
 
-            <section class="settings-section">
+            <section class="settings-section settings-shortcuts">
               <div class="settings-section-heading">
                 <span>快捷键</span>
                 <small>SHORTCUTS</small>
@@ -810,7 +842,7 @@
               </div>
             </section>
 
-            <section class="settings-section">
+            <section class="settings-section settings-desktop-lyrics">
               <div class="settings-section-heading">
                 <span>桌面歌词设置</span>
                 <small>DESKTOP LYRICS</small>
@@ -900,7 +932,7 @@
               </div>
             </section>
 
-            <section class="settings-section">
+            <section class="settings-section settings-windows-integration">
               <div class="settings-section-heading">
                 <span>Windows 集成</span>
                 <small>WINDOWS</small>
@@ -920,7 +952,7 @@
               </p>
             </section>
 
-            <section class="settings-section">
+            <section class="settings-section settings-close-action">
               <div class="settings-section-heading">
                 <span>关闭按钮行为</span>
                 <small>CLOSE ACTION</small>
@@ -954,12 +986,31 @@
                 </div>
               </div>
               <dl class="app-info-list">
-                <div><dt>版本</dt><dd id="settingsAppVersion">V 0.6.0</dd></div>
+                <div><dt>版本</dt><dd id="settingsAppVersion">V 0.6.1</dd></div>
                 <div><dt>作者</dt><dd>Iris Li</dd></div>
                 <div><dt>联系</dt><dd>IrisLi-02@outlook.com</dd></div>
-                <div><dt>技术</dt><dd>Electron · Chromium · music-metadata</dd></div>
+                <div><dt>技术</dt><dd id="settingsTech">Electron · Chromium · music-metadata</dd></div>
                 <div><dt>许可</dt><dd>保留所有权利，详见 LICENSE</dd></div>
               </dl>
+              <div class="settings-update" id="settingsUpdate">
+                <div class="settings-update-copy">
+                  <strong id="updateTitle">检查更新</strong>
+                  <small id="updateStatus">检查是否有可用的新版本。</small>
+                </div>
+                <div class="settings-update-actions">
+                  <button class="settings-action-button" id="checkUpdateButton" type="button">
+                    <svg><use href="#i-external"></use></svg>
+                    检查更新
+                  </button>
+                  <button class="settings-action-button" id="installUpdateButton" type="button" hidden>
+                    <svg><use href="#i-power"></use></svg>
+                    下载并更新
+                  </button>
+                </div>
+                <div class="settings-update-progress" id="updateProgress" hidden>
+                  <span id="updateProgressBar"></span>
+                </div>
+              </div>
               <button class="settings-data-button" id="openUserDataButton" type="button">
                 <svg><use href="#i-folder"></use></svg>
                 打开应用数据目录
@@ -1004,6 +1055,7 @@
     </div>
 
     <audio id="audio" crossorigin="anonymous"></audio>
+    <script src="./android-bridge.js"></script>
     <script src="./i18n.js"></script>
     <script src="./app.js"></script>
   </body>

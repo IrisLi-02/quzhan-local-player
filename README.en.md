@@ -2,14 +2,21 @@
 
 [简体中文](README.md) | **English**
 
-A local-first music player for Windows, built around two problems that are often ignored: **a play queue should not disappear when the app closes**, and **shuffle should not repeat songs before the current listening round is finished**.
+A local-first music player with a Windows desktop app and an Android port, built around two problems that are often ignored: **a play queue should not disappear when the app closes**, and **shuffle should not repeat songs before the current listening round is finished**.
 
 Quzhan does not upload music, connect to online catalogs, or require an account. It only reads local files that you explicitly import, and keeps your queue, playback position, cover art, and lyrics on your computer.
 
-> Interface preview (synthetic test data):  
+> Desktop preview (synthetic test data):
 > ![Quzhan player interface](docs/preview.png)
 >
 > ![Quzhan settings](docs/settings-preview.png)
+
+> Android preview:
+> ![Quzhan for Android player](docs/android-preview.png)
+>
+> ![Quzhan for Android queue](docs/android-queue-preview.png)
+>
+> ![Quzhan for Android settings](docs/android-settings-preview.png)
 
 ## Core Features
 
@@ -18,12 +25,13 @@ Quzhan does not upload music, connect to online catalogs, or require an account.
 - Imports files from a file picker or by dragging files and whole folders into the queue. New tracks are appended in import order.
 - Collapsible queue panel with single-click playback, long-press drag reordering, Ctrl multi-select, Shift range selection, move-to-top, move-to-bottom, and batch removal.
 - The queue automatically scrolls to the current track on track changes, with a Locate current track button in the queue header.
-- Sorts the queue by artist, song title using pinyin/letter order, or the original import order.
+- Sorts the queue by artist, song title using pinyin/letter order, reverse order, or the original import order.
 - Main player controls include cover art, synchronized lyrics, seek bar, previous/next track, −10 s/+10 s seeking, volume, speed, sequential playback, round-aware shuffle, single-track loop, and a loop over selected tracks.
+- If a track cannot be played because its file is unavailable, Quzhan asks whether to remove it from the play queue instead of silently retrying or misreporting another track.
 - Reads embedded lyrics and sidecar `.lrc` files. Timed lyric lines can be clicked to seek.
 - Independent always-on-top desktop lyrics window that remains active when the main window is minimized or hidden to the tray.
 - Real-time audio spectrum above the player controls, which can be disabled in Settings.
-- Settings for default playback speed, default volume, spectrum visibility, close-button behavior, Windows integration, and application information.
+- Settings for default playback speed, default volume, spectrum visibility, close-button behavior, Windows integration, application information, and update checks.
 - Six colorways including Follow cover art and five fixed palettes for borders and desktop lyrics.
 - English, Simplified Chinese, and Traditional Chinese interfaces. The installer defaults to English and offers a language choice at the start.
 - Remappable shortcuts for play/pause, next, previous, ±10 seconds, and desktop lyrics.
@@ -33,6 +41,16 @@ Quzhan does not upload music, connect to online catalogs, or require an account.
 - Cover copies are resized to a maximum edge of 640 px and deduplicated by content hash to keep the data folder small.
 - Registers supported audio formats with Windows “Open with” after the app runs. The Windows Default Apps page can be opened directly from Settings.
 - The first close action asks whether to minimize to the tray or fully quit, with an option to remember the choice.
+
+## Android Version
+
+The Android port lives in [android/](android/README.md). It reuses the same interface, queue, lyrics, three-language support, themes, search and filters, sorting, playback modes, speed control, and spectrum through a Kotlin + WebView host. Android-specific code adds the system file picker, private app storage, background playback, and media notification controls.
+
+The Android build keeps multi-file import, one-tap MediaStore scanning, embedded lyrics and matching `.lrc` files, compressed and deduplicated cover art, custom backgrounds, queue location, reverse ordering, a touch-friendly selection mode, and playback restoration. Desktop-only features are omitted: the desktop lyrics overlay, tray and window-close behavior, Windows file associations, global shortcut recording, and installer options. Music is referenced through SAF or MediaStore rather than copied; app storage contains only queue state, compressed covers, and backgrounds. Large Android queues use viewport-based virtual rendering so only nearby rows exist in the DOM, and idle spectrum work is reduced.
+
+Both desktop and Android Settings include Check for updates. Desktop downloads the new installer and replaces the installed build. Android downloads an APK, validates the package name, version, and signature, then hands it to the system for an in-place update. A normal update does not uninstall the old app, so the queue, settings, played marks, and source references are retained.
+
+Open `android/` in Android Studio, or configure the Android SDK and run `android\gradlew.bat assembleDebug`. The `0.6.1` release APK is signed and has been verified on an Android 15 emulator for import, playback, background playback, notification controls, seeking, and restart restoration. A physical-device acceptance pass is still recommended before public distribution.
 
 ## What Makes It Different
 
@@ -60,13 +78,15 @@ Audio is streamed to Chromium from a temporary loopback-only local server. This 
 - Custom frameless window, collapsible queue, long-press drag, and multi-selection
 - Electron Tray support
 - Windows registry integration for “Open with” and Default Apps registration
+- Android uses Kotlin, WebView, a token-protected loopback media server, and a foreground media notification
 
 ## Download
 
 Check the repository's **Releases** page for:
 
-- `Quzhan-Setup-0.6.0-x64.exe` — installer
-- `Quzhan-Portable-0.6.0-x64.exe` — portable build
+- `Quzhan-Setup-0.6.1-x64.exe` — installer
+- `Quzhan-Portable-0.6.1-x64.exe` — portable build
+- `Quzhan-Android-0.6.1.apk` — Android build
 - `SHA256SUMS.txt` — release checksums
 
 The UI supports English, Simplified Chinese, and Traditional Chinese.
@@ -131,7 +151,7 @@ This is a personal project and the first complete desktop application I have dev
 
 - Author: Iris Li
 - Contact: IrisLi-02@outlook.com
-- Version: `0.6.0`
+- Version: `0.6.1`
 - Platform: Windows 10/11 x64
 
 ### AI Assistance Disclosure

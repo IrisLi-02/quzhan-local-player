@@ -5,6 +5,8 @@ contextBridge.exposeInMainWorld('quzhan', {
   mediaBaseUrl: ipcRenderer.sendSync('media:origin'),
   getState: () => ipcRenderer.invoke('app:get-state'),
   getAppInfo: () => ipcRenderer.invoke('app:info'),
+  checkForUpdate: () => ipcRenderer.invoke('update:check'),
+  installUpdate: (update) => ipcRenderer.invoke('update:install', update),
   saveState: (state) => ipcRenderer.send('state:save', state),
   flushState: (state) => ipcRenderer.invoke('state:flush', state),
   importFromDialog: (existingPaths) =>
@@ -48,6 +50,11 @@ contextBridge.exposeInMainWorld('quzhan', {
     const handler = (_event, value) => callback(Array.isArray(value) ? value : []);
     ipcRenderer.on('covers:optimized', handler);
     return () => ipcRenderer.removeListener('covers:optimized', handler);
+  },
+  onUpdateProgress: (callback) => {
+    const handler = (_event, value) => callback(value);
+    ipcRenderer.on('update:progress', handler);
+    return () => ipcRenderer.removeListener('update:progress', handler);
   },
   showDesktopLyrics: (payload) => ipcRenderer.invoke('desktopLyrics:show', payload),
   hideDesktopLyrics: () => ipcRenderer.invoke('desktopLyrics:hide'),
